@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+*.log
+_deploy_zip.zip
+_TUDO_ALL-SQLS-RUN-NO-SUPABASE.sql
+sql/
+vercel.json
+PUSH_GITHUB.bat
+PUSH_UPDATE.bat

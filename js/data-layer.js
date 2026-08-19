@@ -1,0 +1,1706 @@
+// =====================================================================
+// CAMADA DE DADOS — abstrai entre Mock (localStorage) e Supabase
+// =====================================================================
+// Toda função tem dois caminhos:
+//   - MOCK_MODE = true:  usa dados locais (localStorage + seed)
+//   - MOCK_MODE = false: consulta o banco Supabase via views
+//
+// Interface pública (use SEMPRE estas funções, nunca acesse direto):
+//   - getKPIs()
+//   - getLojasStatus()
+//   - getInquilinos() / getInquilino(id) / saveInquilino(data)
+//   - getContratos() / getContrato(id) / saveContrato(data) / encerrarContrato(id, motivo)
+//   - getPropostas() / getProposta(id) / saveProposta(data) / converterPropostaEmContrato(id, ajustes)
+//   - getVagas()
+//   - getArquivos(entidadeTipo, entidadeId) / uploadArquivo(...)
+// =====================================================================
+
+import { MOCK_MODE, getSupabase, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase-client.js';
+import { parseBR, addMonths, fmtBR } from './utils.js';
+
+// ---------------------------------------------------------------------
+// SEED inicial (espelha o estado atual do dashboard)
+// Carregado uma vez do localStorage; se não existe, popula com dados.
+// ---------------------------------------------------------------------
+const SEED = {
+  lojasInternas: ['02', '03', '49', '52'],
+
+  inquilinos: [
+    { id: 'i1',  tipo: 'PJ', razao_social: 'Empreendimentos Pague Menos S/A',         nome_fantasia: 'Pague Menos',      documento: '06.626.253/0001-51', segmento: 'Farmácia' },
+    { id: 'i2',  tipo: 'PF', razao_social: 'Maria Teresa de Almeida Leôncio Drumond', nome_fantasia: null,               documento: '905.462.611-91',     segmento: 'Comercial' },
+    { id: 'i3',  tipo: 'PJ', razao_social: 'Kamaral Calistenia Ltda',                 nome_fantasia: 'Calistenia',       documento: '63.553.057/0001-38', segmento: 'Fitness/Calistenia' },
+    { id: 'i4',  tipo: 'PJ', razao_social: 'JRBL Calçados Ltda',                      nome_fantasia: 'Constance',        documento: '58.615.483/0001-19', segmento: 'Calçados' },
+    { id: 'i5',  tipo: 'PJ', razao_social: 'MC Mercado Saudável Ltda',                nome_fantasia: 'Amo Verde',        documento: '43.630.337/0001-95', segmento: 'Alimentação saudável' },
+    { id: 'i6',  tipo: 'PF', razao_social: 'Daiane Ferreira Claro Rossafa Barrachi',  nome_fantasia: 'Velocity Studios', documento: 'CPF',                segmento: 'Studios fitness' },
+    { id: 'i7',  tipo: 'PJ', razao_social: 'Academia Noroeste Ltda',                  nome_fantasia: 'Academia Noroeste / Evolve', documento: '62.275.533/0001-33', segmento: 'Academia' },
+    { id: 'i8',  tipo: 'PJ', razao_social: 'Centro de Estética Resende Ltda',         nome_fantasia: 'Bemfina',          documento: '21.538.595/0001-03', segmento: 'Estética/Esmalteria' },
+    { id: 'i9',  tipo: 'PJ', razao_social: 'MCR IT Business Ltda',                    nome_fantasia: 'Mayka',            documento: '58.362.193/0001-00', segmento: 'Vestuário feminino' },
+    { id: 'i10', tipo: 'PJ', razao_social: 'Drogaria Brasil Ltda',                    nome_fantasia: 'Drogaria Brasil',  documento: '00.372.383/0001-29', segmento: 'Farmácia' }
+  ],
+
+  contratos: [
+    { id: 'c1',  inquilino_id: 'i1',  lojas: ['01','04','05'],    data_assinatura: '2025-12-09', data_inicio: '2026-01-30', prazo_meses: 120, valor_aluguel: 39000.00, dia_vencimento: 1,  meses_carencia: 3, indice_reajuste: 'IPCA',  tipo_garantia: 'fianca_pj',           detalhes_garantia: 'DUPAR Participações S/A', parcial: false, observacoes: 'Áreas: L01=54,90m² · L04=117,57m² · L05=29,18m² (total 201,65m²)',                                                                                                                                                                                                                              status: 'ativo' },
+    { id: 'c2',  inquilino_id: 'i2',  lojas: ['06'],              data_assinatura: '2026-05-25', data_inicio: '2026-05-25', prazo_meses: 36,  valor_aluguel: 8500.00,  dia_vencimento: 1,  meses_carencia: 3, indice_reajuste: 'IGP-M', tipo_garantia: 'seguro_fianca',       detalhes_garantia: 'Seguro Fiança Pottencial R$ 255.000 (30× aluguel) · vigência 25/05/2026 a 24/05/2029', parcial: false, observacoes: 'Loja 06 = 44,92m² loja + 24m² depósito = 68,92m². Cláusula especial: vedado acesso operacional pela face da galeria/hall interno.',                                                                       status: 'ativo' },
+    { id: 'c3',  inquilino_id: 'i3',  lojas: ['09'],              data_assinatura: '2025-11-18', data_inicio: '2025-11-18', prazo_meses: 60,  valor_aluguel: 22000.00, dia_vencimento: 15, meses_carencia: 3, indice_reajuste: 'IGP-M', tipo_garantia: 'fianca_pessoal',      detalhes_garantia: '2 fiadores pessoais', parcial: false, observacoes: 'Carência começa após o 1º mês pago.',                                                                                                                                                                                                                                                                              status: 'ativo' },
+    { id: 'c4',  inquilino_id: 'i4',  lojas: ['10'],              data_assinatura: '2025-07-25', data_inicio: '2025-08-31', prazo_meses: 60,  valor_aluguel: 11180.00, dia_vencimento: 10, meses_carencia: 3, indice_reajuste: 'IGP-M', tipo_garantia: 'fianca_pessoal',      detalhes_garantia: '3 fiadores: Renato Maurer, Maria Luciana Lopes, Maria Lucia Lopes', parcial: false, observacoes: 'Preferência de locação à Franqueadora Constance. Mezanino permitido com ART.',                                                                                                                                                                                  status: 'ativo' },
+    { id: 'c5',  inquilino_id: 'i5',  lojas: ['14'],              data_assinatura: '2026-03-11', data_inicio: '2026-03-11', prazo_meses: 36,  valor_aluguel: 7228.80,  dia_vencimento: 1,  meses_carencia: 2, indice_reajuste: 'IGP-M', tipo_garantia: 'seguro_fianca',       detalhes_garantia: 'Seguro Fiança até 30× aluguel · vigência 11/03/2026 a 10/03/2029', parcial: false, observacoes: '',                                                                                                                                                                                                                                                                          status: 'ativo' },
+    { id: 'c6',  inquilino_id: 'i6',  lojas: ['15'],              data_assinatura: '2025-10-17', data_inicio: '2025-10-17', prazo_meses: 60,  valor_aluguel: 20000.00, dia_vencimento: 1,  meses_carencia: 3, indice_reajuste: 'IGP-M', tipo_garantia: 'sem_garantia',        detalhes_garantia: 'Inexistência de garantia', parcial: false, observacoes: 'ÚNICO contrato SEM garantia. Vinculado ao uso da marca STUDIOS.',                                                                                                                                                                                                                                              status: 'ativo' },
+    { id: 'c7',  inquilino_id: 'i7',  lojas: ['19'],              data_assinatura: '2025-06-13', data_inicio: '2025-06-13', prazo_meses: 120, valor_aluguel: 55000.00, dia_vencimento: 10, meses_carencia: 4, indice_reajuste: 'IGP-M', tipo_garantia: 'fianca_pj',           detalhes_garantia: 'Evolve Participações em Sociedades S/A (CNPJ 34.324.641/0001-13)', parcial: true,  observacoes: 'CTO escalonado: Ano 1 R$ 55k · Ano 2 R$ 60k · Ano 3+ R$ 65k. Cláusula de exclusividade: veda academias >500m². Loja 19 = 90,54m² priv + ~1.317m² total com vagas.',                                                                                                       status: 'ativo' },
+    { id: 'c8',  inquilino_id: 'i8',  lojas: ['41','42','43'],    data_assinatura: '2025-05-29', data_inicio: '2025-05-29', prazo_meses: 60,  valor_aluguel: 22161.60, dia_vencimento: 15, meses_carencia: 3, indice_reajuste: 'IGP-M', tipo_garantia: 'fianca_pessoal',      detalhes_garantia: '5 fiadores: F. Rhode, G. Janino, N. Janino, E. Resende, T. Resende', parcial: false, observacoes: 'Originalmente R$ 14.958,40 (Lojas 41+42). 1º Aditivo 27/06/2025: incluiu Loja 43, aluguel R$ 22.161,60. 2º Aditivo 30/01/2026: vencimento dia 1 → dia 15.',                                                                                                       status: 'ativo' },
+    { id: 'c9',  inquilino_id: 'i9',  lojas: ['44'],              data_assinatura: '2026-02-03', data_inicio: '2026-02-03', prazo_meses: 60,  valor_aluguel: 7675.20,  dia_vencimento: 1,  meses_carencia: 3, indice_reajuste: 'IGP-M', tipo_garantia: 'titulo_capitalizacao', detalhes_garantia: 'Título de Capitalização R$ 101.702,40 (12× aluguel)', parcial: false, observacoes: 'Único contrato com Título de Capitalização.',                                                                                                                                                                                                                                          status: 'ativo' },
+    { id: 'c10', inquilino_id: 'i10', lojas: ['50','51'],         data_assinatura: '2025-03-28', data_inicio: '2025-11-27', prazo_meses: 60,  valor_aluguel: 25000.00, dia_vencimento: 1,  meses_carencia: 3, indice_reajuste: 'IPCA',  tipo_garantia: 'fianca_pessoal',      detalhes_garantia: 'Álvaro Silveira Jr + Patricia + Rodrigo + Karine', parcial: false, observacoes: 'Descontos escalonados: m4-6 = R$ 20k · m7-12 = R$ 22k · m13+ = R$ 25k.',                                                                                                                                                                                                                       status: 'ativo' }
+  ],
+
+  propostas: [
+    { id: 'p1', status: 'em_analise',              cliente_nome: 'Julia Ordonho',                                ramo: 'Aluguel de louças para eventos',                                          corretor: 'Biensky Imóveis', cv: '#11667', data_proposta: '2026-06-08', lojas: ['08'],       area_total: 154.77, valor_aluguel: 17024.70, meses_carencia: 4, prazo_opcoes: '3 ou 5 anos (a definir)', tipo_garantia: 'titulo_capitalizacao', detalhes_garantia: 'Título de Capitalização (12× aluguel)',  observacoes: 'Cliente ainda não abriu a empresa, mas atua há anos em Brasília.' },
+    { id: 'p2', status: 'aceita_aguardando_docs',  cliente_nome: 'Marcel — proprietário da Cannelle Veggie',     ramo: 'Cafeteria (nome novo, projeto próprio, mesmo ramo da Cannelle)',          corretor: 'Biensky Imóveis', cv: null,     data_proposta: '2026-06-01', lojas: ['45','46'],  area_total: 93.82,  valor_aluguel: 12000.00, meses_carencia: 4, prazo_opcoes: '5 anos',                  tipo_garantia: 'fianca_pessoal',       detalhes_garantia: 'Fiadores',                              observacoes: 'Cannelle tem 23K seguidores no IG (@cannelleveggie). Aceita em 01/06/2026.' }
+  ],
+
+  // 54 vagas associadas ao contrato c7 (Evolve/Academia Noroeste)
+  vagas: ['08C','09C','10C','11C','12C','13C','14C','15C','16C','17C','18C','19C','20C','21C','22C','23C','24C','25C','26C','27C','28C','29C','30C','38C','39C','40C','41C','42C','43C','44C','45C','46C','47C','48C','49C','50C','51C','52C','53C','54C','64C','65C','66C','67C','68C','69C','70C','71C','72C','73C','74C','75C','76C','77C'],
+
+  arquivos: [
+    // Por ora os PDFs ficam referenciados pelo file:// path original
+    { id: 'a1',  entidade_tipo: 'contrato', entidade_id: 'c1',  categoria: 'contrato_assinado', nome_original: 'Contrato Pague Menos',         storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/1%20-%20Lojas%201%204%20e%205%20-%20Pague%20Menos/001_7164__Contrato_de_Locacao_Site_BSB17_Noroeste311_DF_11_12_25_(autenticado).pdf' },
+    { id: 'a2',  entidade_tipo: 'contrato', entidade_id: 'c2',  categoria: 'contrato_assinado', nome_original: 'Contrato Maria Teresa Drumond', storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/10%20-%20Loja%2006%20-%20Maria%20Teresa%20Drumond/Contrato%20de%20Locacao%20-%20Seguro%20Fianca%20-%20Loja%2006%20-%2025%2005%202026%20pdf-D4Sign.pdf' },
+    { id: 'a3',  entidade_tipo: 'contrato', entidade_id: 'c3',  categoria: 'contrato_assinado', nome_original: 'Contrato Calistenia',           storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/2%20-%20Loja%2009%20-%20Calistenia/2%20Calistenia%20-%20Contrato%20de%20Loca%C3%A7%C3%A3o%20-%20Fian%C3%A7a%20Pessoal%20-%20Union%20-%2010%2010%202025%20sem%20anu%C3%AAncia%20pdf-D4Sign.pdf' },
+    { id: 'a4',  entidade_tipo: 'contrato', entidade_id: 'c4',  categoria: 'contrato_assinado', nome_original: 'Contrato JRBL/Constance',       storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/3%20-%20%20Loja%2010%20-%20Constance/V4-JRBL-Calados---Contrato-de-Locao---Fiana-Pessoal---Union---28-03-2025-pdf-D4Sign.pdf' },
+    { id: 'a5',  entidade_tipo: 'contrato', entidade_id: 'c5',  categoria: 'contrato_assinado', nome_original: 'Contrato Amo Verde',            storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/4%20-%20Loja%2014%20-%20Amo%20Verde/Contrato%20de%20Loca%C3%A7%C3%A3o%20-%20Seguro%20fian%C3%A7a%20-%2028%2003%202025%20Final%201%20pdf-D4Sign.pdf' },
+    { id: 'a6',  entidade_tipo: 'contrato', entidade_id: 'c6',  categoria: 'contrato_assinado', nome_original: 'Contrato Velocity Studios',     storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/5%20-%20%20Loja%2015%20-%20Velocity/2%20Atualizado%20-%20%20Contrato%20de%20Loca%C3%A7%C3%A3o%20-%20Sem%20garantia%20-%20Union%20-14%2010%202025%20pdf-D4Sign%20(1).pdf' },
+    { id: 'a7',  entidade_tipo: 'contrato', entidade_id: 'c7',  categoria: 'contrato_assinado', nome_original: 'Contrato Evolve/Academia',      storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/6%20-%20Loja%2019%20e%20garagens/Contrato%20de%20Loca%C3%A7%C3%A3o%20EVOLVE%20%208-03-2025-VFinal-pdf-D4Sign.pdf' },
+    { id: 'a8',  entidade_tipo: 'contrato', entidade_id: 'c7',  categoria: 'aditivo',           nome_original: '1º Aditivo Substituição Locatário', storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/6%20-%20Loja%2019%20e%20garagens/2026.02.24_-_1ABA_ADITIVO_-_EVOLVE_-_NOROESTE_V2_assinado_assinado.pdf' },
+    { id: 'a9',  entidade_tipo: 'contrato', entidade_id: 'c8',  categoria: 'contrato_assinado', nome_original: 'Contrato Bemfina',              storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/7%20-%20Lojas%2041%2042%20e%2043%20-%20%20Bemfina/3---Contrato-de-Locao---Fiana-Pessoal---Union---28-03-2025-esmalteria-pdf-D4Sign.pdf' },
+    { id: 'a10', entidade_tipo: 'contrato', entidade_id: 'c8',  categoria: 'aditivo',           nome_original: 'Aditivo Inclusão Loja 43',      storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/7%20-%20Lojas%2041%2042%20e%2043%20-%20%20Bemfina/Termo-Aditivo-incluso-loja-43---Fiana-Pessoal---Union---28-03-2025-esmalteria--1--pdf-D4Sign.pdf' },
+    { id: 'a11', entidade_tipo: 'contrato', entidade_id: 'c9',  categoria: 'contrato_assinado', nome_original: 'Contrato Mayka',                storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/8%20-%20Loja%2044%20-%20Maika/Contrato%20de%20Loca%C3%A7%C3%A3o%20-%20T%C3%ADtulo%20de%20capitaliza%C3%A7%C3%A3o%2001%2004%202025%2002%20de%202026%20pdf-D4Sign.pdf' },
+    { id: 'a12', entidade_tipo: 'contrato', entidade_id: 'c10', categoria: 'contrato_assinado', nome_original: 'Contrato Drogaria Brasil',      storage_path: 'file:///C:/Users/fabricio.aroeira/Desktop/CLAUDE/PASTA%20CLAUDE/9%20-%20%20Lojas%2050%20e%2051%20-%20%20Drogaria%20Brasil/Drogaria%20Brasil%20-%20Contrato%20de%20Loca%C3%A7%C3%A3o%20-%20Fian%C3%A7a%20Pessoal%20-%20Union%20-%2028%2003%202025%20pdf-D4Sign.pdf' }
+  ]
+};
+
+// ---------------------------------------------------------------------
+// Storage para o modo mock (persiste em localStorage)
+// ---------------------------------------------------------------------
+const STORAGE_KEY = 'union511_data_v1';
+
+function loadStore() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try { return JSON.parse(raw); }
+    catch (e) { console.warn('Corrompido, regenerando seed'); }
+  }
+  return JSON.parse(JSON.stringify(SEED));
+}
+
+function saveStore(store) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+}
+
+function nextId(prefix) {
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// =====================================================================
+// API PÚBLICA
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// LOJAS — status (computa em runtime no mock)
+// ---------------------------------------------------------------------
+export async function getLojasStatus() {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    const out = [];
+    for (let i = 1; i <= 52; i++) {
+      const codigo = String(i).padStart(2, '0');
+      let status = 'disponivel';
+      let inquilino_atual = null;
+      let parcial = false;
+      if (store.lojasInternas.includes(codigo)) {
+        status = 'uso_interno';
+      } else {
+        const contrato = store.contratos.find(c => c.status === 'ativo' && c.lojas.includes(codigo));
+        if (contrato) {
+          status = 'ocupada';
+          const inq = store.inquilinos.find(i => i.id === contrato.inquilino_id);
+          inquilino_atual = contrato.nome_fantasia_contrato || inq?.nome_fantasia || inq?.razao_social;
+          parcial = contrato.parcial;
+        } else {
+          const propAceita = store.propostas.find(p => p.status === 'aceita_aguardando_docs' && p.lojas.includes(codigo));
+          if (propAceita) status = 'proposta_aceita';
+          else {
+            const propAnalise = store.propostas.find(p => ['em_analise','em_negociacao'].includes(p.status) && p.lojas.includes(codigo));
+            if (propAnalise) status = 'proposta_analise';
+          }
+        }
+      }
+      out.push({ id: i, codigo, status, inquilino_atual, parcial });
+    }
+    return out;
+  } else {
+    const supa = await getSupabase();
+    const { data, error } = await supa.from('v_lojas_status').select('*').order('id');
+    if (error) throw error;
+    return data;
+  }
+}
+
+// ---------------------------------------------------------------------
+// KPIs do topo do dashboard
+// ---------------------------------------------------------------------
+export async function getKPIs() {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    const ocupadas = new Set();
+    store.contratos.filter(c => c.status === 'ativo').forEach(c => c.lojas.forEach(l => ocupadas.add(l)));
+    const inquilinosAtivos = new Set(store.contratos.filter(c => c.status === 'ativo').map(c => c.inquilino_id));
+    const receita = store.contratos.filter(c => c.status === 'ativo').reduce((s, c) => s + Number(c.valor_aluguel), 0);
+    const propAtivas = store.propostas.filter(p => ['em_analise','em_negociacao','aceita_aguardando_docs'].includes(p.status)).length;
+    return {
+      total_lojas: 52,
+      lojas_internas: store.lojasInternas.length,
+      lojas_locaveis: 52 - store.lojasInternas.length,
+      lojas_ocupadas: ocupadas.size,
+      inquilinos_ativos: inquilinosAtivos.size,
+      receita_cheia_mes: receita,
+      propostas_ativas: propAtivas,
+      vagas_ocupadas: store.vagas.length,
+      vagas_comerciais_total: 80
+    };
+  } else {
+    const supa = await getSupabase();
+    const { data, error } = await supa.from('v_kpis').select('*').single();
+    if (error) throw error;
+    return data;
+  }
+}
+
+// ---------------------------------------------------------------------
+// INQUILINOS
+// ---------------------------------------------------------------------
+export async function getInquilinos() {
+  if (MOCK_MODE) return loadStore().inquilinos;
+  const supa = await getSupabase();
+  const { data } = await supa.from('inquilinos').select('*').order('razao_social');
+  return data;
+}
+
+export async function getInquilino(id) {
+  if (MOCK_MODE) return loadStore().inquilinos.find(i => i.id === id);
+  const supa = await getSupabase();
+  const { data } = await supa.from('inquilinos').select('*').eq('id', id).single();
+  return data;
+}
+
+export async function saveInquilino(input) {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    if (input.id) {
+      const idx = store.inquilinos.findIndex(i => i.id === input.id);
+      store.inquilinos[idx] = { ...store.inquilinos[idx], ...input };
+    } else {
+      input.id = nextId('i');
+      store.inquilinos.push(input);
+    }
+    saveStore(store);
+    return input;
+  } else {
+    const supa = await getSupabase();
+    if (input.id) {
+      const { data } = await supa.from('inquilinos').update(input).eq('id', input.id).select().single();
+      return data;
+    } else {
+      const { data } = await supa.from('inquilinos').insert(input).select().single();
+      return data;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
+// CONTRATOS (com inquilino e lojas agregados)
+// ---------------------------------------------------------------------
+export async function getContratos(statusFilter = 'ativo') {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    return store.contratos
+      .filter(c => statusFilter === 'all' || c.status === statusFilter)
+      .map(c => {
+        const inq = store.inquilinos.find(i => i.id === c.inquilino_id) || {};
+        return {
+          ...c,
+          razao_social: inq.razao_social,
+          nome_fantasia: inq.nome_fantasia,
+          documento: inq.documento,
+          segmento: inq.segmento,
+          data_termino: fmtBR(addMonths(parseBR(c.data_inicio), c.prazo_meses))
+        };
+      });
+  } else {
+    const supa = await getSupabase();
+    let q = supa.from('v_contratos_completo').select('*');
+    if (statusFilter !== 'all') q = q.eq('status', statusFilter);
+    const { data } = await q;
+    if (!data) return data;
+    // Busca nome_fantasia_contrato (campo NOVO em contratos, ainda pode não estar na view)
+    try {
+      const ids = data.map(c => c.id);
+      if (ids.length > 0) {
+        const { data: extras } = await supa.from('contratos').select('id, nome_fantasia_contrato').in('id', ids);
+        const mapa = Object.fromEntries((extras || []).map(x => [x.id, x.nome_fantasia_contrato]));
+        data.forEach(c => { c.nome_fantasia_contrato = mapa[c.id] || null; });
+      }
+    } catch (_) { /* coluna pode ainda não existir; ignora silenciosamente */ }
+    return data;
+  }
+}
+
+export async function getContrato(id) {
+  if (MOCK_MODE) {
+    const all = await getContratos('all');
+    return all.find(c => c.id === id);
+  }
+  const supa = await getSupabase();
+  const { data } = await supa.from('v_contratos_completo').select('*').eq('id', id).single();
+  if (data) {
+    try {
+      const { data: extra } = await supa.from('contratos').select('nome_fantasia_contrato').eq('id', id).single();
+      data.nome_fantasia_contrato = extra?.nome_fantasia_contrato || null;
+    } catch (_) { /* coluna pode ainda não existir */ }
+  }
+  return data;
+}
+
+export async function saveContrato(input) {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    if (input.id) {
+      const idx = store.contratos.findIndex(c => c.id === input.id);
+      store.contratos[idx] = { ...store.contratos[idx], ...input };
+    } else {
+      input.id = nextId('c');
+      input.status = input.status || 'ativo';
+      store.contratos.push(input);
+    }
+    saveStore(store);
+    return input;
+  } else {
+    const supa = await getSupabase();
+    // Separa lojas (n:n) do contrato base
+    const { lojas, id: _idIgnorado, ...contratoBase } = input;
+
+    // VALIDAÇÃO ANTI-DUPLICAÇÃO: verifica se alguma das lojas selecionadas já tem contrato ativo
+    if (lojas?.length) {
+      const lojasIds = lojas.map(c => parseInt(c, 10));
+      let qConflito = supa.from('contrato_lojas')
+        .select('loja_id, contrato_id, contratos!inner(status)')
+        .in('loja_id', lojasIds)
+        .eq('contratos.status', 'ativo');
+      if (input.id) qConflito = qConflito.neq('contrato_id', input.id); // ao editar, ignora o próprio
+      const { data: conflitos, error: errConf } = await qConflito;
+      if (errConf) throw new Error('Erro ao verificar lojas: ' + errConf.message);
+      if (conflitos && conflitos.length > 0) {
+        const lojasOcupadas = [...new Set(conflitos.map(c => String(c.loja_id).padStart(2, '0')))].sort();
+        throw new Error('Loja(s) já ocupada(s) por contrato ativo: ' + lojasOcupadas.join(', ') + '. Encerre o contrato anterior antes de criar um novo.');
+      }
+    }
+
+    let contrato;
+    const lojasFoiPassado = 'lojas' in input; // true mesmo se [] (limpar tudo)
+    if (input.id) {
+      const { data, error } = await supa.from('contratos').update(contratoBase).eq('id', input.id).select().single();
+      if (error) throw new Error('Erro ao atualizar contrato: ' + (error.message || JSON.stringify(error)));
+      contrato = data;
+      // SÓ apaga vínculos se o caller realmente quer substituir as lojas.
+      // Antes: sempre apagava — bug ao chamar saveContrato({id, status:'encerrado'}) sem lojas perdia os vínculos.
+      if (lojasFoiPassado) {
+        await supa.from('contrato_lojas').delete().eq('contrato_id', input.id);
+      }
+    } else {
+      // Remove campos null/undefined/vazios pra deixar o default do banco atuar (ex: id = gen_random_uuid())
+      const payload = Object.fromEntries(Object.entries(contratoBase).filter(([_, v]) => v !== null && v !== undefined && v !== ''));
+      const { data, error } = await supa.from('contratos').insert(payload).select().single();
+      if (error) throw new Error('Erro ao criar contrato: ' + (error.message || JSON.stringify(error)));
+      contrato = data;
+    }
+    if (!contrato || !contrato.id) throw new Error('Contrato salvo mas resposta vazia');
+    if (lojasFoiPassado && lojas?.length) {
+      const lojasMapeadas = lojas.map(codigo => ({ contrato_id: contrato.id, loja_id: parseInt(codigo, 10) }));
+      const { error: errLojas } = await supa.from('contrato_lojas').insert(lojasMapeadas);
+      if (errLojas) throw new Error('Erro ao vincular lojas ao contrato: ' + errLojas.message);
+    }
+    return contrato;
+  }
+}
+
+export async function encerrarContrato(id, motivo, data_encerramento = new Date()) {
+  return saveContrato({
+    id,
+    status: 'encerrado',
+    motivo_encerramento: motivo,
+    data_encerramento: fmtBR(data_encerramento)
+  });
+}
+
+// ---------------------------------------------------------------------
+// PROPOSTAS
+// ---------------------------------------------------------------------
+export async function getPropostas(statusFilter = 'ativas') {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    let lista = store.propostas;
+    if (statusFilter === 'ativas') {
+      lista = lista.filter(p => ['em_analise','em_negociacao','aceita_aguardando_docs'].includes(p.status));
+    } else if (statusFilter !== 'all') {
+      lista = lista.filter(p => p.status === statusFilter);
+    }
+    // calcular R$/m²
+    return lista.map(p => ({
+      ...p,
+      rs_por_m2: p.area_total ? (p.valor_aluguel / p.area_total) : null
+    }));
+  } else {
+    const supa = await getSupabase();
+    let q = supa.from('v_propostas_completo').select('*');
+    if (statusFilter === 'ativas') q = q.in('status', ['em_analise','em_negociacao','aceita_aguardando_docs']);
+    else if (statusFilter !== 'all') q = q.eq('status', statusFilter);
+    const { data } = await q;
+    return data;
+  }
+}
+
+export async function getProposta(id) {
+  if (MOCK_MODE) return (await getPropostas('all')).find(p => p.id === id);
+  const supa = await getSupabase();
+  const { data } = await supa.from('v_propostas_completo').select('*').eq('id', id).single();
+  return data;
+}
+
+export async function saveProposta(input) {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    if (input.id) {
+      const idx = store.propostas.findIndex(p => p.id === input.id);
+      store.propostas[idx] = { ...store.propostas[idx], ...input };
+    } else {
+      input.id = nextId('p');
+      input.status = input.status || 'em_analise';
+      store.propostas.push(input);
+    }
+    saveStore(store);
+    return input;
+  } else {
+    const supa = await getSupabase();
+    const { lojas, id: _idIgnorado, ...base } = input;
+    let prop;
+    if (input.id) {
+      const { data, error } = await supa.from('propostas').update(base).eq('id', input.id).select().single();
+      if (error) throw new Error('Erro ao atualizar proposta: ' + error.message);
+      prop = data;
+      await supa.from('proposta_lojas').delete().eq('proposta_id', input.id);
+    } else {
+      const payload = Object.fromEntries(Object.entries(base).filter(([_, v]) => v !== null && v !== undefined && v !== ''));
+      const { data, error } = await supa.from('propostas').insert(payload).select().single();
+      if (error) throw new Error('Erro ao criar proposta: ' + error.message);
+      prop = data;
+    }
+    if (!prop || !prop.id) throw new Error('Proposta salva mas resposta vazia');
+    if (lojas?.length) {
+      await supa.from('proposta_lojas').insert(lojas.map(codigo => ({ proposta_id: prop.id, loja_id: parseInt(codigo, 10) })));
+    }
+    return prop;
+  }
+}
+
+// Excluir proposta — reverte lead vinculado pra estágio anterior (se houver) e apaga
+export async function deleteProposta(propostaId, opts = {}) {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    store.propostas = store.propostas.filter(p => p.id !== propostaId);
+    saveStore(store);
+    return;
+  }
+  const supa = await getSupabase();
+  // 1. Procura lead vinculado a essa proposta
+  const { data: leads } = await supa.from('leads').select('id').eq('proposta_id', propostaId);
+  // 2. Reverte status do lead (devolve ao estágio do opts.reverterParaStatus, default = 'interessado')
+  if (leads && leads.length > 0) {
+    const novoStatus = opts.reverterParaStatus || 'interessado';
+    for (const l of leads) {
+      await supa.from('leads').update({
+        status: novoStatus,
+        proposta_id: null,
+        data_fim: null
+      }).eq('id', l.id);
+    }
+  }
+  // 3. Deleta proposta_lojas e a proposta
+  await supa.from('proposta_lojas').delete().eq('proposta_id', propostaId);
+  const { error } = await supa.from('propostas').delete().eq('id', propostaId);
+  if (error) throw new Error('Erro ao excluir proposta: ' + error.message);
+}
+
+// Converter proposta em contrato — copia campos e marca proposta como convertida
+export async function converterPropostaEmContrato(propostaId, ajustes = {}) {
+  const prop = await getProposta(propostaId);
+  if (!prop) throw new Error('Proposta não encontrada');
+
+  // Cria o contrato com dados da proposta + ajustes
+  const novoContrato = {
+    inquilino_id: prop.inquilino_id || ajustes.inquilino_id,
+    data_assinatura: ajustes.data_assinatura || fmtBR(new Date()),
+    data_inicio: ajustes.data_inicio || fmtBR(new Date()),
+    prazo_meses: ajustes.prazo_meses || 60,
+    valor_aluguel: prop.valor_aluguel,
+    dia_vencimento: ajustes.dia_vencimento || 1,
+    meses_carencia: prop.meses_carencia,
+    indice_reajuste: ajustes.indice_reajuste || 'IGP-M',
+    tipo_garantia: prop.tipo_garantia,
+    detalhes_garantia: prop.detalhes_garantia,
+    parcial: false,
+    observacoes: 'Convertido da proposta de ' + prop.data_proposta + '. ' + (prop.observacoes || ''),
+    lojas: prop.lojas,
+    status: 'ativo',
+    ...ajustes
+  };
+
+  const contrato = await saveContrato(novoContrato);
+
+  // Marca proposta como convertida
+  await saveProposta({
+    id: propostaId,
+    status: 'convertida_em_contrato',
+    contrato_id: contrato.id,
+    data_decisao: fmtBR(new Date())
+  });
+
+  return contrato;
+}
+
+// ---------------------------------------------------------------------
+// LEADS (CRM) — clientes em estudo, antes da proposta formal
+// ---------------------------------------------------------------------
+export async function getLeads(statusFilter = 'ativos') {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    let lista = store.leads || [];
+    if (statusFilter === 'ativos') {
+      lista = lista.filter(l => ['interessado','visitou','em_analise'].includes(l.status));
+    } else if (statusFilter !== 'todos') {
+      lista = lista.filter(l => l.status === statusFilter);
+    }
+    return lista;
+  }
+  const supa = await getSupabase();
+  let q = supa.from('v_leads_completo').select('*');
+  if (statusFilter === 'ativos') q = q.in('status', ['interessado','visitou','em_analise']);
+  else if (statusFilter !== 'todos') q = q.eq('status', statusFilter);
+  const { data, error } = await q.order('updated_at', { ascending: false });
+  if (error) throw new Error('Erro ao buscar leads: ' + error.message);
+  return data || [];
+}
+
+export async function getLead(id) {
+  if (MOCK_MODE) return (await getLeads('todos')).find(l => l.id === id);
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('v_leads_completo').select('*').eq('id', id).single();
+  if (error) throw new Error('Erro ao buscar lead: ' + error.message);
+  return data;
+}
+
+export async function saveLead(input) {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    store.leads = store.leads || [];
+    if (input.id) {
+      const idx = store.leads.findIndex(l => l.id === input.id);
+      store.leads[idx] = { ...store.leads[idx], ...input };
+    } else {
+      input.id = nextId('l');
+      input.status = input.status || 'interessado';
+      input.data_inicio = input.data_inicio || new Date().toISOString().slice(0,10);
+      store.leads.push(input);
+    }
+    saveStore(store);
+    return input;
+  }
+  const supa = await getSupabase();
+  const { lojas, interacoes, id: _idIgnorado, qtd_interacoes, ultima_interacao_data, ...base } = input;
+
+  let lead;
+  if (input.id) {
+    const { data, error } = await supa.from('leads').update(base).eq('id', input.id).select().single();
+    if (error) throw new Error('Erro ao atualizar lead: ' + error.message);
+    lead = data;
+    await supa.from('lead_lojas').delete().eq('lead_id', input.id);
+  } else {
+    const payload = Object.fromEntries(Object.entries(base).filter(([_, v]) => v !== null && v !== undefined && v !== ''));
+    const { data, error } = await supa.from('leads').insert(payload).select().single();
+    if (error) throw new Error('Erro ao criar lead: ' + error.message);
+    lead = data;
+  }
+
+  if (!lead || !lead.id) throw new Error('Lead salvo mas resposta vazia');
+
+  if (lojas?.length) {
+    const lojasMapeadas = lojas.map(codigo => ({ lead_id: lead.id, loja_id: parseInt(codigo, 10) }));
+    const { error: errLojas } = await supa.from('lead_lojas').insert(lojasMapeadas);
+    if (errLojas) throw new Error('Erro ao vincular lojas ao lead: ' + errLojas.message);
+  }
+
+  return lead;
+}
+
+export async function adicionarInteracao(leadId, { tipo = 'nota', conteudo, data = null }) {
+  if (!conteudo?.trim()) throw new Error('Informe o conteúdo da interação');
+  if (MOCK_MODE) {
+    const store = loadStore();
+    store.lead_interacoes = store.lead_interacoes || [];
+    const inter = { id: nextId('i'), lead_id: leadId, tipo, conteudo, data: data || new Date().toISOString() };
+    store.lead_interacoes.push(inter);
+    saveStore(store);
+    return inter;
+  }
+  const supa = await getSupabase();
+  const payload = { lead_id: leadId, tipo, conteudo };
+  if (data) payload.data = data;
+  const { data: inserted, error } = await supa.from('lead_interacoes').insert(payload).select().single();
+  if (error) throw new Error('Erro ao adicionar interação: ' + error.message);
+  return inserted;
+}
+
+export async function deleteLead(id) {
+  if (MOCK_MODE) {
+    const store = loadStore();
+    store.leads = (store.leads || []).filter(l => l.id !== id);
+    saveStore(store);
+    return;
+  }
+  const supa = await getSupabase();
+  const { error } = await supa.from('leads').delete().eq('id', id);
+  if (error) throw new Error('Erro ao excluir lead: ' + error.message);
+}
+
+export async function vincularLeadAProposta(leadId, propostaId) {
+  if (MOCK_MODE) {
+    return saveLead({ id: leadId, status: 'virou_proposta', proposta_id: propostaId, data_fim: new Date().toISOString().slice(0,10) });
+  }
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('leads').update({
+    status: 'virou_proposta',
+    proposta_id: propostaId,
+    data_fim: new Date().toISOString().slice(0,10)
+  }).eq('id', leadId).select().single();
+  if (error) throw new Error('Erro ao vincular lead à proposta: ' + error.message);
+  await adicionarInteracao(leadId, { tipo: 'mudanca_status', conteudo: 'Lead convertido em proposta formal.' });
+  return data;
+}
+
+
+// ---------------------------------------------------------------------
+// FINANCEIRO - Cobranças
+// ---------------------------------------------------------------------
+export async function getCobrancas(filtros) {
+  if (MOCK_MODE) return [];
+  const mes = filtros && filtros.mes;
+  const status = filtros && filtros.status;
+  const contrato_id = filtros && filtros.contrato_id;
+  const supa = await getSupabase();
+  let q = supa.from('v_cobrancas_completo').select('*');
+  if (mes) {
+    const inicio = mes + '-01';
+    const fimDate = new Date(mes + '-01T00:00:00');
+    fimDate.setMonth(fimDate.getMonth() + 1);
+    const fimStr = fimDate.toISOString().slice(0, 10);
+    q = q.gte('competencia', inicio).lt('competencia', fimStr);
+  }
+  if (status) q = q.eq('status', status);
+  if (contrato_id) q = q.eq('contrato_id', contrato_id);
+  const { data, error } = await q.order('vencimento', { ascending: true });
+  if (error) throw new Error('Erro ao buscar cobrancas: ' + error.message);
+  return data || [];
+}
+
+export async function gerarCobrancasDoMes(mes) {
+  if (MOCK_MODE) return { qtd: 0 };
+  const supa = await getSupabase();
+  const mesRef = mes || new Date().toISOString().slice(0, 10);
+  const { data, error } = await supa.rpc('gerar_cobrancas_do_mes', { mes_ref: mesRef });
+  if (error) throw new Error('Erro ao gerar cobrancas: ' + error.message);
+  return { qtd: data || 0 };
+}
+
+export async function marcarCobrancaPaga(cobrancaId, pagamento) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const payload = {
+    status: 'paga',
+    data_pagamento: pagamento.data_pagamento,
+    valor_pago: pagamento.valor_pago,
+    multa: pagamento.multa || 0,
+    juros: pagamento.juros || 0,
+    correcao_monetaria: pagamento.correcao || 0
+  };
+  if (pagamento.observacoes) payload.observacoes = pagamento.observacoes;
+  const { error } = await supa.from('cobrancas').update(payload).eq('id', cobrancaId);
+  if (error) throw new Error('Erro ao marcar como paga: ' + error.message);
+}
+
+export async function marcarCobrancaParcial(cobrancaId, pagamento) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const obs = (pagamento.observacoes || '') + ' [Pagamento parcial em desacordo com clausula 5.7]';
+  const { error } = await supa.from('cobrancas').update({
+    status: 'parcial',
+    data_pagamento: pagamento.data_pagamento,
+    valor_pago: pagamento.valor_pago,
+    observacoes: obs
+  }).eq('id', cobrancaId);
+  if (error) throw new Error('Erro ao marcar parcial: ' + error.message);
+}
+
+export async function getInadimplencia() {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('v_inadimplencia').select('*').order('dias_atraso', { ascending: false });
+  if (error) throw new Error('Erro ao buscar inadimplencia: ' + error.message);
+  return data || [];
+}
+
+export async function atualizarStatusAtrasadas() {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const hoje = new Date().toISOString().slice(0, 10);
+  await supa.from('cobrancas').update({ status: 'atrasada' })
+    .eq('status', 'pendente').lt('vencimento', hoje);
+}
+
+// ---------------------------------------------------------------------
+// FINANCEIRO - Despesas e Fornecedores
+// ---------------------------------------------------------------------
+export async function getFornecedores(filtros) {
+  if (MOCK_MODE) return [];
+  const ativo = filtros && filtros.ativo !== undefined ? filtros.ativo : true;
+  const supa = await getSupabase();
+  let q = supa.from('fornecedores').select('*');
+  if (ativo !== null) q = q.eq('ativo', ativo);
+  const { data, error } = await q.order('nome');
+  if (error) throw new Error('Erro ao buscar fornecedores: ' + error.message);
+  return data || [];
+}
+
+export async function saveFornecedor(input) {
+  if (MOCK_MODE) return input;
+  const supa = await getSupabase();
+  const { id, ...base } = input;
+  const payload = Object.fromEntries(Object.entries(base).filter(([_, v]) => v !== null && v !== undefined && v !== ''));
+  if (id) {
+    const { data, error } = await supa.from('fornecedores').update(payload).eq('id', id).select().single();
+    if (error) throw new Error('Erro ao atualizar fornecedor: ' + error.message);
+    return data;
+  }
+  const { data, error } = await supa.from('fornecedores').insert(payload).select().single();
+  if (error) throw new Error('Erro ao criar fornecedor: ' + error.message);
+  return data;
+}
+
+export async function getDespesas(filtros) {
+  if (MOCK_MODE) return [];
+  const mes = filtros && filtros.mes;
+  const status = filtros && filtros.status;
+  const categoria = filtros && filtros.categoria;
+  const supa = await getSupabase();
+  let q = supa.from('despesas').select('*, fornecedores(nome, categoria)');
+  if (mes) {
+    const inicio = mes + '-01';
+    const fimDate = new Date(mes + '-01T00:00:00');
+    fimDate.setMonth(fimDate.getMonth() + 1);
+    q = q.gte('competencia', inicio).lt('competencia', fimDate.toISOString().slice(0, 10));
+  }
+  if (status) q = q.eq('status', status);
+  if (categoria) q = q.eq('categoria', categoria);
+  const { data, error } = await q.order('vencimento', { ascending: true });
+  if (error) throw new Error('Erro ao buscar despesas: ' + error.message);
+  return data || [];
+}
+
+export async function saveDespesa(input) {
+  if (MOCK_MODE) return input;
+  const supa = await getSupabase();
+  const { id, fornecedores: _fj, ...base } = input;
+  const payload = Object.fromEntries(Object.entries(base).filter(([_, v]) => v !== null && v !== undefined && v !== ''));
+  if (id) {
+    const { data, error } = await supa.from('despesas').update(payload).eq('id', id).select().single();
+    if (error) throw new Error('Erro ao atualizar despesa: ' + error.message);
+    return data;
+  }
+  const { data, error } = await supa.from('despesas').insert(payload).select().single();
+  if (error) throw new Error('Erro ao criar despesa: ' + error.message);
+  return data;
+}
+
+export async function marcarDespesaPaga(despesaId, pagamento) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('despesas').update({
+    status: 'paga',
+    data_pagamento: pagamento.data_pagamento,
+    valor_pago: pagamento.valor_pago
+  }).eq('id', despesaId);
+  if (error) throw new Error('Erro ao marcar despesa paga: ' + error.message);
+}
+
+// ---------------------------------------------------------------------
+// FINANCEIRO - Reajustes e IGP-M
+// ---------------------------------------------------------------------
+export async function getReajustes(contrato_id) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  let q = supa.from('reajustes').select('*');
+  if (contrato_id) q = q.eq('contrato_id', contrato_id);
+  const { data, error } = await q.order('data_efetivacao', { ascending: false });
+  if (error) throw new Error('Erro ao buscar reajustes: ' + error.message);
+  return data || [];
+}
+
+export async function aplicarReajuste(reajuste) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { data: reaj, error: errReaj } = await supa.from('reajustes').insert({
+    contrato_id: reajuste.contrato_id,
+    valor_anterior: reajuste.valor_anterior,
+    valor_novo: reajuste.valor_novo,
+    indice: reajuste.indice,
+    variacao_pct: reajuste.variacao_pct,
+    periodo_inicio: reajuste.periodo_inicio,
+    periodo_fim: reajuste.periodo_fim,
+    data_efetivacao: reajuste.data_efetivacao,
+    observacoes: reajuste.observacoes || null,
+    automatico: false
+  }).select().single();
+  if (errReaj) throw new Error('Erro ao registrar reajuste: ' + errReaj.message);
+  const { error: errCont } = await supa.from('contratos').update({ valor_aluguel: reajuste.valor_novo }).eq('id', reajuste.contrato_id);
+  if (errCont) throw new Error('Erro ao atualizar valor do contrato: ' + errCont.message);
+  return reaj;
+}
+
+export async function getIGPMUltimosMeses(meses) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('indices_economicos').select('*').eq('indice', 'IGP-M')
+    .order('competencia', { ascending: false }).limit(meses || 12);
+  if (error) throw new Error('Erro ao buscar IGP-M: ' + error.message);
+  return data || [];
+}
+
+export async function buscarIGPMdoBCB(mesesParaTras) {
+  const fim = new Date();
+  const inicio = new Date(fim.getFullYear(), fim.getMonth() - (mesesParaTras || 24), 1);
+  const fmt = (d) => String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+  const url = 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.189/dados?formato=json&dataInicial=' + fmt(inicio) + '&dataFinal=' + fmt(fim);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Erro ao buscar IGP-M na API do BCB: ' + r.status);
+  const data = await r.json();
+  if (MOCK_MODE) return data;
+  const supa = await getSupabase();
+  const registros = data.map(d => {
+    const partes = d.data.split('/');
+    return {
+      indice: 'IGP-M',
+      competencia: partes[2] + '-' + partes[1] + '-01',
+      valor_mensal: parseFloat(d.valor)
+    };
+  });
+  if (registros.length > 0) {
+    await supa.from('indices_economicos').upsert(registros, { onConflict: 'indice,competencia' });
+  }
+  return registros;
+}
+
+export function calcularReajusteIGPM(igpmMeses12, valorAtual) {
+  const fatorAcum = igpmMeses12.reduce((acc, m) => acc * (1 + Number(m.valor_mensal) / 100), 1);
+  const variacaoPct = (fatorAcum - 1) * 100;
+  const valorNovo = Math.round(valorAtual * fatorAcum * 100) / 100;
+  return { variacaoPct, valorNovo, fatorAcum };
+}
+
+// ---------------------------------------------------------------------
+// FINANCEIRO - DRE Mensal
+// ---------------------------------------------------------------------
+export async function getDREMensal(filtros) {
+  if (MOCK_MODE) return [];
+  const inicio = filtros && filtros.inicio;
+  const fim = filtros && filtros.fim;
+  const supa = await getSupabase();
+  let q = supa.from('v_dre_mensal').select('*');
+  if (inicio) q = q.gte('mes', inicio);
+  if (fim) q = q.lte('mes', fim);
+  const { data, error } = await q.order('mes', { ascending: false });
+  if (error) throw new Error('Erro ao buscar DRE: ' + error.message);
+  return data || [];
+}
+
+// ---------------------------------------------------------------------
+// ARQUIVOS
+// ---------------------------------------------------------------------
+export async function getArquivos(entidade_tipo, entidade_id) {
+  if (MOCK_MODE) {
+    return loadStore().arquivos.filter(a => a.entidade_tipo === entidade_tipo && a.entidade_id === entidade_id);
+  }
+  const supa = await getSupabase();
+  const { data } = await supa.from('arquivos').select('*').eq('entidade_tipo', entidade_tipo).eq('entidade_id', entidade_id);
+  return data;
+}
+
+// Deleta arquivo: remove do Storage E do registro na tabela
+export async function deleteArquivo(arquivoId, storage_path) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  if (storage_path) {
+    try { await supa.storage.from('arquivos').remove([storage_path]); }
+    catch (e) { console.warn('Falha ao remover do Storage (segue):', e); }
+  }
+  const { error } = await supa.from('arquivos').delete().eq('id', arquivoId);
+  if (error) throw new Error('Erro ao excluir arquivo: ' + error.message);
+}
+
+// =====================================================================
+// DOCUMENTOS DE CONTRATO (seguros, certidões, vistorias, AVCB...)
+// =====================================================================
+export const TIPOS_DOCUMENTO = {
+  // Documentos do próprio contrato (sem prazo de validade)
+  contrato:                    'Contrato (PDF original)',
+  aditivo:                     'Aditivo contratual',
+  // Documentos com prazo de validade (geram alertas)
+  seguro_fianca:               'Seguro fiança',
+  seguro_incendio:             'Seguro incêndio',
+  certidao_negativa_federal:   'Certidão negativa federal',
+  certidao_negativa_municipal: 'Certidão negativa municipal',
+  certidao_negativa_estadual:  'Certidão negativa estadual',
+  certidao_trabalhista:        'Certidão trabalhista',
+  vistoria_inicial:            'Vistoria inicial',
+  vistoria_final:              'Vistoria final',
+  laudo_avcb:                  'Laudo AVCB',
+  alvara_funcionamento:        'Alvará de funcionamento',
+  outros:                      'Outros'
+};
+
+export async function getDocumentosByContrato(contratoId) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('documentos_contrato')
+    .select('*').eq('contrato_id', contratoId).order('data_validade');
+  if (error) throw new Error('Erro ao buscar documentos: ' + error.message);
+  return data || [];
+}
+
+// Todos os documentos do portfólio com dados do inquilino (pra Chat IA, alertas, etc.)
+export async function getDocumentosTodos() {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('documentos_contrato')
+    .select('*, contratos(id, inquilino_id, inquilinos(razao_social, nome_fantasia))')
+    .order('data_validade');
+  if (error) throw new Error('Erro ao buscar documentos: ' + error.message);
+  return (data || []).map(d => {
+    var inq = (d.contratos && d.contratos.inquilinos) || {};
+    return Object.assign({}, d, {
+      inquilino_razao_social: inq.razao_social || null,
+      inquilino_nome_fantasia: inq.nome_fantasia || null
+    });
+  });
+}
+export async function saveDocumento(input) {
+  if (MOCK_MODE) return input;
+  const supa = await getSupabase();
+  const { id, ...base } = input;
+  const payload = Object.fromEntries(
+    Object.entries(base).filter(([_, v]) => v !== null && v !== undefined && v !== '')
+  );
+  if (id) {
+    const { data, error } = await supa.from('documentos_contrato').update(payload).eq('id', id).select().single();
+    if (error) throw new Error('Erro ao atualizar documento: ' + error.message);
+    return data;
+  }
+  const { data, error } = await supa.from('documentos_contrato').insert(payload).select().single();
+  if (error) throw new Error('Erro ao criar documento: ' + error.message);
+  return data;
+}
+
+export async function deleteDocumento(id) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('documentos_contrato').delete().eq('id', id);
+  if (error) throw new Error('Erro ao excluir documento: ' + error.message);
+}
+
+// =====================================================================
+// GESTÕES DO CONTRATO — itens gestionáveis extraídos pelo IA
+// =====================================================================
+
+// Lista ocorrências PENDENTES de todos os contratos (com inquilino + gestão).
+// Substitui a antiga lógica de "gestões com data_evento" no painel de Alertas.
+export async function getOcorrenciasPendentesGlobal() {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa
+    .from('gestao_ocorrencias')
+    .select(`id, gestao_id, contrato_id, data_prevista, status,
+             gestoes_contrato!inner(titulo, tipo, descricao, clausula_origem, categoria),
+             contratos!inner(id, inquilinos!inner(nome_fantasia, razao_social))`)
+    .eq('status', 'pendente')
+    .order('data_prevista', { ascending: true });
+  if (error) {
+    if (/relation .* does not exist|Could not find the table|schema cache/i.test(error.message)) return [];
+    throw new Error('Erro ao carregar ocorrências: ' + error.message);
+  }
+  return (data || []).map(o => ({
+    ...o,
+    titulo: o.gestoes_contrato?.titulo,
+    tipo: o.gestoes_contrato?.tipo,
+    descricao: o.gestoes_contrato?.descricao,
+    clausula_origem: o.gestoes_contrato?.clausula_origem,
+    categoria: o.gestoes_contrato?.categoria,
+    inquilino: o.contratos?.inquilinos?.nome_fantasia || o.contratos?.inquilinos?.razao_social || '?',
+    data_evento: o.data_prevista
+  }));
+}
+
+// =====================================================================
+// ANEXOS UNIFICADOS — junta arquivos brutos + documentos com validade
+// Cada item devolvido tem a mesma estrutura, com flag `fonte`:
+//   fonte='arquivo'   → vem da tabela arquivos
+//   fonte='documento' → vem de documentos_contrato (tem data_validade)
+// =====================================================================
+export async function getAnexosContrato(contratoId) {
+  if (MOCK_MODE) return [];
+  // Tabela 'documentos' é a fonte única dos anexos do contrato (post-unificação SQL_ANEXOS_UNIFICADOS).
+  // Inclui PDF do contrato, aditivos, seguros, certidões, AVCB — com ou sem data_validade.
+  const documentos = await getDocumentosByContrato(contratoId).catch(() => []);
+  const anexos = (documentos || []).map(d => ({
+    id: d.id,
+    fonte: 'documento',
+    categoria: d.tipo || 'outros',
+    tipo: d.tipo,
+    numero: d.numero,
+    descricao: d.descricao,
+    nome_original: d.nome_original || d.descricao || d.numero || (TIPOS_DOCUMENTO[d.tipo] || d.tipo),
+    tamanho_bytes: d.tamanho_bytes || null,
+    storage_path: d.arquivo_url || null,
+    data_emissao: d.data_emissao,
+    data_validade: d.data_validade,         // alimenta os alertas automáticos
+    observacoes: d.observacoes,
+    created_at: d.created_at
+  }));
+  // Ordena: com validade próxima primeiro, depois por data de criação desc
+  return anexos.sort((a, b) => {
+    if (a.data_validade && b.data_validade) return new Date(a.data_validade) - new Date(b.data_validade);
+    if (a.data_validade) return -1;
+    if (b.data_validade) return 1;
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
+}
+
+export async function getGestoesAtivas() {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa
+    .from('gestoes_contrato')
+    .select(`
+      id, titulo, tipo, descricao, clausula_origem,
+      data_evento, recorrencia, dias_aviso, status,
+      contrato_id,
+      contratos!inner(
+        id,
+        inquilinos!inner(nome_fantasia, razao_social)
+      )
+    `)
+    .eq('ativo', true)
+    .not('data_evento', 'is', null)
+    .order('data_evento', { ascending: true });
+  if (error) throw new Error('Erro ao carregar gestões: ' + error.message);
+  // Achata estrutura aninhada pra facilitar uso
+  return (data || []).map(g => ({
+    ...g,
+    inquilino: g.contratos?.inquilinos?.nome_fantasia || g.contratos?.inquilinos?.razao_social || '?'
+  }));
+}
+
+// =====================================================================
+// OCORRÊNCIAS (instâncias dos ciclos de gestão)
+// =====================================================================
+
+// Lista ocorrências de uma gestão (com info de anexo se houver)
+export async function getOcorrenciasPorGestao(gestaoId) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa
+    .from('gestao_ocorrencias')
+    .select(`id, gestao_id, contrato_id, data_prevista, data_cumprida, status,
+             observacao, arquivo_id, cumprido_em,
+             arquivos(id, nome_original, storage_path, categoria)`)
+    .eq('gestao_id', gestaoId)
+    .order('data_prevista', { ascending: true });
+  if (error) {
+    if (/relation .* does not exist|Could not find the table|schema cache/i.test(error.message)) return [];
+    throw new Error('Erro ao carregar ocorrências: ' + error.message);
+  }
+  return (data || []).map(o => ({ ...o, arquivo: o.arquivos || null }));
+}
+
+// Marca uma ocorrência como cumprida. Opcionalmente anexa arquivo.
+// O arquivo (se passado) é salvo como anexo do contrato + vinculado à ocorrência.
+export async function marcarOcorrenciaCumprida(ocorrenciaId, { dataCumprida, observacao, arquivoFile, contratoId }) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  let arquivoId = null;
+
+  // Se tem arquivo opcional, faz upload primeiro (vira anexo do contrato também)
+  if (arquivoFile && contratoId) {
+    const { uploadArquivo } = await import('./upload.js');
+    const arq = await uploadArquivo(arquivoFile, {
+      entidade_tipo: 'contrato',
+      entidade_id: contratoId,
+      categoria: 'comprovante'
+    });
+    arquivoId = arq?.id || null;
+  }
+
+  const patch = {
+    status: 'cumprido',
+    data_cumprida: dataCumprida || new Date().toISOString().slice(0,10),
+    observacao: observacao || null
+  };
+  if (arquivoId) patch.arquivo_id = arquivoId;
+
+  const { error } = await supa.from('gestao_ocorrencias').update(patch).eq('id', ocorrenciaId);
+  if (error) throw new Error('Erro ao marcar cumprida: ' + error.message);
+  return true;
+}
+
+// Desfaz cumprimento (volta pra pendente) — útil se marcou errado
+export async function reabrirOcorrencia(ocorrenciaId) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('gestao_ocorrencias').update({
+    status: 'pendente',
+    data_cumprida: null,
+    cumprido_em: null
+  }).eq('id', ocorrenciaId);
+  if (error) throw new Error('Erro ao reabrir ocorrência: ' + error.message);
+  return true;
+}
+
+// Histórico de alterações de um contrato (audit log)
+export async function getHistoricoContrato(contratoId) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa
+    .from('contratos_historico')
+    .select('id, acao, campos_alterados, alterado_em, observacao')
+    .eq('contrato_id', contratoId)
+    .order('alterado_em', { ascending: false });
+  if (error) {
+    // Se a tabela ainda não foi criada, devolve vazio em vez de quebrar
+    if (/relation .* does not exist|Could not find the table|schema cache/i.test(error.message)) return [];
+    throw new Error('Erro ao carregar histórico: ' + error.message);
+  }
+  return data || [];
+}
+
+// Lista todas as gestões de um contrato, ordenadas por data de evento
+export async function getGestoesPorContrato(contratoId) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa
+    .from('gestoes_contrato')
+    .select('*')
+    .eq('contrato_id', contratoId)
+    .order('data_evento', { ascending: true, nullsFirst: false });
+  if (error) throw new Error('Erro ao carregar gestões: ' + error.message);
+  return data || [];
+}
+
+// Toggle ativo/inativo de uma gestão
+export async function atualizarGestaoAtivo(gestaoId, ativo) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('gestoes_contrato')
+    .update({ ativo }).eq('id', gestaoId);
+  if (error) throw new Error('Erro ao atualizar gestão: ' + error.message);
+}
+
+// Marca uma gestão como executada (registra última_acao)
+export async function marcarGestaoExecutada(gestaoId) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('gestoes_contrato')
+    .update({ status: 'executado', ultima_acao_em: new Date().toISOString() })
+    .eq('id', gestaoId);
+  if (error) throw new Error('Erro ao marcar gestão: ' + error.message);
+}
+
+// =====================================================================
+// KIT PADRÃO DE GESTÕES — cria automaticamente ao salvar contrato novo
+// Baseado em SQL_GESTOES_KIT_PADRAO.sql (10 gestões estruturais)
+// Retorna { qtd, erros } — qtd inseridas com sucesso, erros se algum falhou.
+// =====================================================================
+export async function criarGestoesAutomaticas(contratoId, contrato) {
+  if (MOCK_MODE) return { qtd: 0, erros: [] };
+  if (!contratoId || !contrato) return { qtd: 0, erros: ['dados incompletos'] };
+
+  const supa = await getSupabase();
+
+  // helper pra adicionar N meses a uma data ISO (YYYY-MM-DD) sem drift de fuso
+  const addMonths = (iso, meses) => {
+    if (!iso) return null;
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setMonth(dt.getMonth() + meses);
+    return dt.toISOString().slice(0, 10);
+  };
+  const addDays = (iso, dias) => {
+    if (!iso) return null;
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + dias);
+    return dt.toISOString().slice(0, 10);
+  };
+
+  const inicio = contrato.data_inicio;
+  const prazo = Number(contrato.prazo_meses || 0);
+  const carencia = Number(contrato.meses_carencia || 0);
+  const indice = contrato.indice_reajuste || 'IGP-M';
+  const garantia = contrato.tipo_garantia || 'garantia';
+
+  if (!inicio || !prazo) return { qtd: 0, erros: ['contrato sem data_inicio ou prazo_meses'] };
+
+  const termino = addMonths(inicio, prazo);
+  const gestoes = [];
+
+  // 1) Fim da carência (só se houver)
+  if (carencia > 0) {
+    gestoes.push({
+      contrato_id: contratoId,
+      titulo: 'Fim da carência',
+      tipo: 'carencia_fim',
+      descricao: carencia + ' meses de carência (começa após pagamento do 1º mês). Quando atingir esta data, a cobrança volta ao normal.',
+      clausula_origem: 'Quadro Resumo — carência contratual',
+      data_evento: addMonths(inicio, carencia),
+      recorrencia: 'one_off',
+      dias_aviso: [7, 3],
+      gerado_por: 'ia'
+    });
+  }
+
+  // 2) Aniversário / Reajuste anual (recorrente até término)
+  gestoes.push({
+    contrato_id: contratoId,
+    titulo: 'Aniversário do contrato / Reajuste anual',
+    tipo: 'reajuste_aniversario',
+    descricao: 'Reajuste anual pelo ' + indice + '. Se variação negativa, mantém valor.',
+    clausula_origem: 'Cláusula de reajuste do Quadro Resumo',
+    data_evento: addMonths(inicio, 12),
+    recorrencia: 'anual',
+    recorrencia_ate: termino,
+    dias_aviso: [30, 15, 7],
+    parametros: { indice, fallback: 'IPCA', bloquear_se_negativo: true, calcular_valor: true },
+    gerado_por: 'ia'
+  });
+
+  // 3) Marco 5 anos (só se prazo >= 60 meses)
+  if (prazo >= 60) {
+    gestoes.push({
+      contrato_id: contratoId,
+      titulo: 'Janela legal de ação renovatória (Lei 8.245)',
+      tipo: 'marco_5anos',
+      descricao: 'Início da janela legal (1 a 0,5 ano antes do término). Decidir se renova, retoma ou renegocia.',
+      clausula_origem: 'Lei 8.245/91, art. 51',
+      data_evento: addMonths(termino, -12),
+      recorrencia: 'one_off',
+      dias_aviso: [60, 30],
+      gerado_por: 'ia'
+    });
+  }
+
+  // 4) Aviso prévio de devolução (30 dias antes do término)
+  gestoes.push({
+    contrato_id: contratoId,
+    titulo: 'Aviso prévio de devolução',
+    tipo: 'aviso_devolucao',
+    descricao: 'Início do período mínimo de 30 dias antes da entrega do imóvel.',
+    clausula_origem: 'Cláusula de devolução do contrato',
+    data_evento: addDays(termino, -30),
+    recorrencia: 'one_off',
+    dias_aviso: [14, 7],
+    gerado_por: 'ia'
+  });
+
+  // 5) Término do contrato
+  gestoes.push({
+    contrato_id: contratoId,
+    titulo: 'Término do contrato',
+    tipo: 'termino',
+    descricao: 'Devolução automática. Decidir antes: renovação, retomada ou novo contrato.',
+    clausula_origem: 'Quadro Resumo — vigência',
+    data_evento: termino,
+    recorrencia: 'one_off',
+    dias_aviso: [180, 90, 60, 30],
+    gerado_por: 'ia'
+  });
+
+  // 6) Reanálise da garantia (anual)
+  gestoes.push({
+    contrato_id: contratoId,
+    titulo: 'Reanálise da garantia (' + garantia + ')',
+    tipo: 'validacao_fianca',
+    descricao: 'Solicitar certidões negativas e/ou comprovantes da garantia (' + garantia + ') e reanalisar.',
+    clausula_origem: 'Quadro Resumo — garantia',
+    data_evento: addMonths(inicio, 12),
+    recorrencia: 'anual',
+    recorrencia_ate: termino,
+    dias_aviso: [30],
+    gerado_por: 'ia'
+  });
+
+  // 7) Solicitar comprovantes (semestral)
+  gestoes.push({
+    contrato_id: contratoId,
+    titulo: 'Solicitar comprovantes (IPTU/condomínio/água/luz)',
+    tipo: 'comprovantes',
+    descricao: 'Locatário deve fornecer cópias quando solicitado. Cobrar semestralmente como auditoria preventiva.',
+    clausula_origem: 'Cláusula de tributos/encargos',
+    data_evento: addMonths(inicio, 6),
+    recorrencia: 'semestral',
+    recorrencia_ate: termino,
+    dias_aviso: [7],
+    gerado_por: 'ia'
+  });
+
+  // 8) Vistoria preventiva (anual)
+  gestoes.push({
+    contrato_id: contratoId,
+    titulo: 'Vistoria preventiva do imóvel',
+    tipo: 'vistoria',
+    descricao: 'Agendamento anual de vistoria preventiva com aviso prévio ao locatário.',
+    clausula_origem: 'Cláusula de vistoria',
+    data_evento: addMonths(inicio, 12),
+    recorrencia: 'anual',
+    recorrencia_ate: termino,
+    dias_aviso: [14],
+    gerado_por: 'ia'
+  });
+
+  // 9) Apólice de seguro (anual)
+  gestoes.push({
+    contrato_id: contratoId,
+    titulo: 'Pedir apólice de seguro vigente',
+    tipo: 'seguro',
+    descricao: 'Locatário responsável pela contratação de seguro incêndio + seguro das mercadorias. Pedir cópia anualmente.',
+    clausula_origem: 'Cláusula de seguros',
+    data_evento: addMonths(inicio, 12),
+    recorrencia: 'anual',
+    recorrencia_ate: termino,
+    dias_aviso: [30],
+    gerado_por: 'ia'
+  });
+
+  // 10) Alteração de uso — informativa (sem data)
+  gestoes.push({
+    contrato_id: contratoId,
+    titulo: 'Alteração de uso requer anuência prévia',
+    tipo: 'destinacao',
+    descricao: 'Mudança da destinação comercial só com anuência prévia da locadora. Regra informativa.',
+    clausula_origem: 'Cláusula de destinação do imóvel',
+    recorrencia: 'informativo',
+    parametros: { so_consulta: true },
+    gerado_por: 'ia'
+  });
+
+  const { error } = await supa.from('gestoes_contrato').insert(gestoes);
+  if (error) return { qtd: 0, erros: [error.message] };
+  return { qtd: gestoes.length, erros: [] };
+}
+
+// =====================================================================
+// CONFIGURAÇÕES DO APP (chave/valor JSONB) — ex: coordenadas da planta
+// =====================================================================
+export async function getAppConfig(chave) {
+  if (MOCK_MODE) return null;
+  try {
+    const supa = await getSupabase();
+    const { data, error } = await supa.from('app_config').select('valor').eq('chave', chave).maybeSingle();
+    if (error) return null; // tabela pode não existir ainda — comporta como "sem config"
+    return data?.valor ?? null;
+  } catch (_) { return null; }
+}
+
+export async function saveAppConfig(chave, valor) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('app_config')
+    .upsert({ chave, valor, updated_at: new Date().toISOString() }, { onConflict: 'chave' });
+  if (error) throw new Error('Erro ao salvar config: ' + error.message);
+}
+
+// =====================================================================
+// ADMINISTRAÇÃO DE USUÁRIOS (papéis) — apenas admin
+// =====================================================================
+
+// Papel do usuário logado atualmente
+export async function getMeuPapel() {
+  if (MOCK_MODE) return 'admin';
+  const supa = await getSupabase();
+  const { data, error } = await supa.rpc('user_role');
+  if (error) return null;
+  return data;
+}
+
+// Lista todos os usuários (perfis + email/last_sign_in vindo de auth.users via view)
+// Como auth.users não é acessível diretamente via PostgREST, usamos a tabela perfis
+// + email/last_sign_in_at que o admin consulta via RPC
+export async function getUsuarios() {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  // Busca perfis (com RLS já filtrando apenas o que admin pode ver = todos)
+  const { data: perfis, error } = await supa.from('perfis')
+    .select('user_id, role, nome, ativo, created_at, updated_at')
+    .order('created_at');
+  if (error) throw new Error('Erro ao buscar perfis: ' + error.message);
+  // Tenta enriquecer com email + last_sign_in_at via RPC opcional
+  // Se a RPC não existir, devolve só os perfis (email vazio)
+  let usuariosAuth = [];
+  try {
+    const { data: rpcData } = await supa.rpc('get_users_admin');
+    if (Array.isArray(rpcData)) usuariosAuth = rpcData;
+  } catch (e) { /* RPC opcional */ }
+  const mapAuth = {};
+  usuariosAuth.forEach(u => { mapAuth[u.user_id || u.id] = u; });
+  return (perfis || []).map(p => ({
+    ...p,
+    email: mapAuth[p.user_id]?.email || '',
+    last_sign_in_at: mapAuth[p.user_id]?.last_sign_in_at || null
+  }));
+}
+
+// Atualiza o papel de um usuário (só admin via policy perfis_update_admin)
+export async function atualizarPapelUsuario(userId, novoPapel) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('perfis').update({ role: novoPapel }).eq('user_id', userId);
+  if (error) throw new Error('Erro ao atualizar papel: ' + error.message);
+}
+
+// Ativa/desativa usuário (sem deletar a conta no Supabase Auth)
+export async function atualizarAtivoUsuario(userId, ativo) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('perfis').update({ ativo }).eq('user_id', userId);
+  if (error) throw new Error('Erro ao atualizar status: ' + error.message);
+}
+
+// =====================================================================
+// Operações privilegiadas via Edge Function admin-users
+// (precisam de service_role no servidor; front só chama)
+// =====================================================================
+async function chamarAdminUsers(payload) {
+  const supa = await getSupabase();
+  const { data: sess } = await supa.auth.getSession();
+  const token = sess?.session?.access_token;
+  if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/admin-users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'apikey': SUPABASE_ANON_KEY
+    },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: 'Resposta inválida' }));
+  if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+
+export async function criarUsuario({ email, password, nome, role }) {
+  if (MOCK_MODE) return { userId: 'mock-' + Date.now() };
+  return chamarAdminUsers({ mode: 'create_user', email, password, nome, role });
+}
+
+export async function alterarSenhaUsuario(userId, password) {
+  if (MOCK_MODE) return;
+  return chamarAdminUsers({ mode: 'update_password', userId, password });
+}
+
+export async function alterarNomeUsuario(userId, nome) {
+  if (MOCK_MODE) return;
+  return chamarAdminUsers({ mode: 'update_name', userId, nome });
+}
+
+export async function excluirUsuario(userId) {
+  if (MOCK_MODE) return;
+  return chamarAdminUsers({ mode: 'delete_user', userId });
+}
+
+// =====================================================================
+// SIENGE — espelho das parcelas (fonte de verdade financeira)
+// =====================================================================
+
+/**
+ * Receita cheia/mês consolidada do PORTFÓLIO inteiro.
+ * Pra cada contrato ativo:
+ *   - Se tem SIENGE → usa valor_mes_atual (soma dos componentes do mês corrente)
+ *   - Se não tem SIENGE → usa valor_aluguel do contrato (fallback "estimado")
+ * Retorna: { total_sienge, total_estimado, total_geral, contratos: [{id, nome, valor, origem}] }
+ */
+export async function getReceitaConsolidadaPortfolio() {
+  if (MOCK_MODE) return { total_sienge: 0, total_estimado: 0, total_geral: 0, total_contratual: 0, contratos: [] };
+  const supa = await getSupabase();
+  const [contratos, saldos] = await Promise.all([
+    supa.from('v_contratos_completo').select('id, nome_fantasia, razao_social, valor_aluguel, valor_base').eq('status', 'ativo'),
+    supa.from('v_saldo_sienge_por_contrato').select('contrato_id, tem_sienge, valor_mes_atual')
+  ]);
+  const saldoMap = {};
+  (saldos.data || []).forEach(s => { saldoMap[s.contrato_id] = s; });
+
+  let total_sienge = 0, total_estimado = 0, total_contratual = 0;
+  const detalhes = (contratos.data || []).map(c => {
+    const s = saldoMap[c.id];
+    const tem = !!(s && s.tem_sienge);
+    const valor = tem && Number(s.valor_mes_atual) > 0
+      ? Number(s.valor_mes_atual)
+      : Number(c.valor_aluguel || 0);
+    // Valor contratual = valor base do contrato (o que está cravado no papel)
+    const valorContratual = Number(c.valor_base || c.valor_aluguel || 0);
+    total_contratual += valorContratual;
+    if (tem && Number(s.valor_mes_atual) > 0) total_sienge += valor;
+    else total_estimado += valor;
+    return {
+      id: c.id,
+      nome: c.nome_fantasia_contrato || c.nome_fantasia || c.razao_social,
+      valor,
+      valor_contratual: valorContratual,
+      origem: (tem && Number(s.valor_mes_atual) > 0) ? 'sienge' : 'estimado'
+    };
+  });
+  return {
+    total_sienge,
+    total_estimado,
+    total_geral: total_sienge + total_estimado,
+    total_contratual,
+    contratos: detalhes
+  };
+}
+
+/**
+ * Lista parcelas SIENGE atrasadas de TODO O PORTFÓLIO (com dados do contrato).
+ * Retorna: array de { parcela, contrato_id, nome_fantasia, dias_atraso }
+ */
+export async function getInadimplenciaSienge() {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  // Atualiza status primeiro (a_vencer → atrasada conforme data atual). Ignora erro se RPC não existir.
+  try { await supa.rpc('fn_recalcular_status_sienge'); } catch (_) {}
+  const { data: parcs } = await supa.from('sienge_parcelas')
+    .select('*')
+    .eq('status', 'atrasada')
+    .order('data_vencimento');
+  if (!parcs || parcs.length === 0) return [];
+
+  const ids = [...new Set(parcs.map(p => p.contrato_id))];
+  const { data: ctrs } = await supa.from('v_contratos_completo').select('id, nome_fantasia, razao_social').in('id', ids);
+  const nome = Object.fromEntries((ctrs || []).map(c => [c.id, c.nome_fantasia_contrato || c.nome_fantasia || c.razao_social]));
+
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  return parcs.map(p => {
+    const venc = p.data_vencimento ? new Date(p.data_vencimento + 'T00:00:00') : null;
+    const dias_atraso = venc ? Math.floor((hoje - venc) / 86400000) : null;
+    return {
+      ...p,
+      contrato_nome: nome[p.contrato_id] || '?',
+      dias_atraso
+    };
+  });
+}
+
+/**
+ * Parcelas SIENGE do mês corrente (todas, agrupadas por contrato).
+ * Usado pela aba Financeiro pra montar "Cobranças do mês".
+ */
+export async function getCobrancasSiengeDoMes(yyyymm) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const mes = yyyymm || new Date().toISOString().slice(0,7);
+  const inicio = mes + '-01';
+  // Calcula último dia do mês
+  const [y, m] = mes.split('-').map(Number);
+  const ultimoDia = new Date(y, m, 0).getDate();
+  const fim = `${mes}-${String(ultimoDia).padStart(2,'0')}`;
+
+  const { data: parcs } = await supa.from('sienge_parcelas')
+    .select('*')
+    .gte('data_vencimento', inicio)
+    .lte('data_vencimento', fim)
+    .order('data_vencimento');
+  if (!parcs || parcs.length === 0) return [];
+
+  const ids = [...new Set(parcs.map(p => p.contrato_id))];
+  const { data: ctrs } = await supa.from('v_contratos_completo').select('id, nome_fantasia, razao_social').in('id', ids);
+  const nome = Object.fromEntries((ctrs || []).map(c => [c.id, c.nome_fantasia_contrato || c.nome_fantasia || c.razao_social]));
+  return parcs.map(p => ({ ...p, contrato_nome: nome[p.contrato_id] || '?' }));
+}
+
+/**
+ * DRE mensal via SIENGE: receita = soma valor_pago das parcelas pagas no mês; despesa continua local.
+ */
+export async function getDREMensalSienge(meses = 6) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const hoje = new Date();
+  const linhas = [];
+  for (let i = 0; i < meses; i++) {
+    const dt = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const yyyymm = dt.toISOString().slice(0,7);
+    const inicio = yyyymm + '-01';
+    const [y, m] = yyyymm.split('-').map(Number);
+    const ultimoDia = new Date(y, m, 0).getDate();
+    const fim = `${yyyymm}-${String(ultimoDia).padStart(2,'0')}`;
+
+    const { data: pagas } = await supa.from('sienge_parcelas')
+      .select('valor_pago')
+      .eq('status', 'paga')
+      .gte('data_pagamento', inicio)
+      .lte('data_pagamento', fim);
+    const receita = (pagas || []).reduce((s, p) => s + Number(p.valor_pago || 0), 0);
+
+    const { data: desp } = await supa.from('despesas').select('valor_pago, valor').eq('status', 'paga')
+      .gte('data_pagamento', inicio).lte('data_pagamento', fim);
+    const despesa = (desp || []).reduce((s, d) => s + Number(d.valor_pago || d.valor || 0), 0);
+
+    linhas.push({ mes: inicio, receita_recebida: receita, despesa_paga: despesa, resultado_caixa: receita - despesa });
+  }
+  return linhas;
+}
+
+/**
+ * Lista todas as parcelas SIENGE de um contrato, ordenadas por vencimento.
+ */
+export async function getSiengeParcelas(contratoId) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('sienge_parcelas')
+    .select('*')
+    .eq('contrato_id', contratoId)
+    .order('data_vencimento');
+  if (error) throw new Error('Erro ao buscar parcelas SIENGE: ' + error.message);
+  return data || [];
+}
+
+/**
+ * Saldo consolidado SIENGE de um contrato (via view).
+ * Retorna: { tem_sienge, ultima_importacao, total_a_vencer, total_pago, qtd_atrasadas, proxima_parcela, valor_mes_atual }
+ */
+export async function getSaldoSiengePorContrato(contratoId) {
+  if (MOCK_MODE) return null;
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('v_saldo_sienge_por_contrato')
+    .select('*')
+    .eq('contrato_id', contratoId)
+    .limit(1);
+  if (error) return null;
+  return data?.[0] || null;
+}
+
+/**
+ * Importa um PDF de Saldo Devedor do SIENGE pra um contrato.
+ * Lê o PDF via IA, upsert em sienge_parcelas (idempotente).
+ * Retorna: { meta, importadas, atualizadas, total_parcelas }
+ */
+export async function importarSiengePDF(contratoId, pdfFile) {
+  if (MOCK_MODE) throw new Error('Importação SIENGE não disponível em MOCK_MODE');
+  if (!contratoId) throw new Error('contratoId é obrigatório');
+  if (!pdfFile) throw new Error('PDF é obrigatório');
+  if (pdfFile.type !== 'application/pdf') throw new Error('Arquivo precisa ser PDF');
+
+  // 1) Manda PDF pra IA extrair (claude-proxy modo extract_sienge)
+  const { extrairSiengeDoPDF } = await import('./claude.js');
+  const extraido = await extrairSiengeDoPDF(pdfFile);
+
+  // extraido = { meta, campos: [...], parcelas: [[...arrays...]], totais }
+  const parcelasRaw = Array.isArray(extraido?.parcelas) ? extraido.parcelas : [];
+  if (parcelasRaw.length === 0) throw new Error('IA não conseguiu extrair nenhuma parcela do PDF.');
+
+  // Schema: a IA retorna parcelas como arrays compactos. Os campos vêm em extraido.campos
+  // Ordem padrão: [sienge_codigo, componente, parcela_num, parcela_total, data_vencimento,
+  //                valor_original, valor_corrigido, indexador, data_pagamento, valor_pago, status]
+  const camposDefault = ['sienge_codigo','componente','parcela_num','parcela_total','data_vencimento','valor_original','valor_corrigido','indexador','data_pagamento','valor_pago','status'];
+  const campos = Array.isArray(extraido?.campos) && extraido.campos.length > 0 ? extraido.campos : camposDefault;
+
+  // Converte cada array em objeto
+  const parcelas = parcelasRaw.map(p => {
+    // Se a IA já retornou objeto (compatibilidade), passa direto
+    if (!Array.isArray(p)) return p;
+    const obj = {};
+    campos.forEach((c, idx) => { obj[c] = p[idx]; });
+    return obj;
+  });
+
+  // 2) Hoje pra calcular status
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  // 3) Monta payload com contrato_id e status validado
+  const payload = parcelas.map(p => {
+    let status = p.status;
+    if (!status) {
+      if (p.data_pagamento) status = 'paga';
+      else if (p.data_vencimento && p.data_vencimento < hoje) status = 'atrasada';
+      else status = 'a_vencer';
+    }
+    // sienge_titulo (legível) sempre garantido — fallback em cascata
+    const sienge_codigo = p.sienge_codigo || 'SEM_CODIGO';
+    let sienge_titulo = p.sienge_titulo;
+    if (!sienge_titulo) {
+      sienge_titulo = p.sienge_titulo_id ? `${p.sienge_titulo_id} / ${sienge_codigo}` : sienge_codigo;
+    }
+    return {
+      contrato_id: contratoId,
+      sienge_titulo: sienge_titulo,
+      sienge_titulo_id: p.sienge_titulo_id || null,
+      sienge_codigo: sienge_codigo,
+      componente: p.componente || 'outros',
+      parcela_num: p.parcela_num != null ? Number(p.parcela_num) : null,
+      parcela_total: p.parcela_total != null ? Number(p.parcela_total) : null,
+      parcela_rotulo: p.parcela_rotulo || (p.parcela_num && p.parcela_total ? `${p.parcela_num}/${p.parcela_total}` : null),
+      data_vencimento: p.data_vencimento,
+      valor_original: Number(p.valor_original),
+      valor_corrigido: Number(p.valor_corrigido != null ? p.valor_corrigido : p.valor_original),
+      indexador: p.indexador || null,
+      data_pagamento: p.data_pagamento || null,
+      valor_pago: p.valor_pago != null ? Number(p.valor_pago) : null,
+      status
+    };
+  });
+
+  // 4) Desduplica dentro do array (mesma chave única não pode aparecer 2x no mesmo upsert)
+  // Chave: contrato_id + sienge_codigo + parcela_num + data_vencimento
+  const dedupMap = new Map();
+  let duplicados = 0;
+  for (const item of payload) {
+    const chave = [item.contrato_id, item.sienge_codigo, item.parcela_num ?? 'NULL', item.data_vencimento].join('|');
+    if (dedupMap.has(chave)) duplicados++;
+    dedupMap.set(chave, item); // último vence (mantém o mais recente em caso de conflito)
+  }
+  const payloadDedup = Array.from(dedupMap.values());
+
+  // 5) Upsert (idempotente pela unique index contrato+codigo+parcela_num+venc)
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('sienge_parcelas')
+    .upsert(payloadDedup, { onConflict: 'contrato_id,sienge_codigo,parcela_num,data_vencimento', ignoreDuplicates: false })
+    .select();
+  if (error) throw new Error('Erro ao salvar parcelas: ' + error.message);
+
+  return {
+    meta: extraido?.meta || null,
+    totais: extraido?.totais || null,
+    importadas: data?.length || 0,
+    total_extraidas: parcelas.length,
+    duplicados_descartados: duplicados
+  };
+}

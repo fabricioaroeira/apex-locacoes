@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Union 511">
+<!-- CSP básico: restringe scripts/estilos a self + CDNs conhecidos + endpoints Supabase/Anthropic -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.anthropic.com; frame-src 'self' blob:;">
+<title>Union 511 — Gestão de Locação</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="theme-color" content="#707272">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/app.css">
+<link rel="stylesheet" href="./css/forms.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="header-brand">
+    <img src="./imgs/logo-union511.png" alt="Union 511 Residence Mall" class="logo">
+    <div class="titles">
+      <h1>Painel de Controle</h1>
+      <div class="sub">CRNW 511, Setor Noroeste, Brasília/DF · 52 lojas · 80 vagas</div>
+    </div>
+  </div>
+  <div class="user-menu">
+    <span class="meta">Atualizado em <strong id="today"></strong></span>
+    <span class="nome" id="user-nome">—</span>
+    <button id="btn-admin" title="Administração de usuários" style="display:none">⚙️ Admin</button>
+    <button id="btn-logout">Sair</button>
+  </div>
+</header>
+
+<!-- Tabs -->
+<div class="tabs" id="tabs">
+  <button class="tab active" data-panel="overview">Visão Geral</button>
+  <button class="tab" data-panel="ocupadas">Lojas Alugadas <span data-counter="ocupadas"></span></button>
+  <button class="tab" data-panel="disponiveis">Lojas Disponíveis <span data-counter="disponiveis"></span></button>
+  <button class="tab" data-panel="inquilinos">Inquilinos <span data-counter="inquilinos"></span></button>
+  <button class="tab" data-panel="propostas">Propostas <span data-counter="propostas"></span></button>
+  <button class="tab" data-panel="leads">Leads <span data-counter="leads"></span></button>
+  <button class="tab" data-panel="financeiro">Financeiro</button>
+  <button class="tab" data-panel="vencimentos">Vencimentos/Renovações</button>
+  <button class="tab" data-panel="alertas">Alertas/Pendências</button>
+</div>
+
+<!-- Banner de alertas (renderizado dinamicamente; só aparece se houver pendências) -->
+<section id="alertas-banner"></section>
+
+<!-- KPIs -->
+<section class="kpis" id="kpis"></section>
+
+<!-- Visão Geral -->
+<div class="panel active" id="overview">
+  <div class="card" id="card-mapa">
+    <div class="card-head">
+      <h2>Mapa do empreendimento — 52 lojas</h2>
+      <button class="btn outline sm" id="btn-mapa-fullscreen">🔍 Maximizar</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>📊 Acompanhamento de locação</h2>
+      <span id="acomp-resumo" style="font-size:12px;color:var(--ink-soft)"></span>
+    </div>
+    <div id="acomp-legenda" style="display:flex;gap:14px;font-size:11px;color:var(--ink-soft);margin-bottom:10px"></div>
+    <div id="acomp-tabelas" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Funil comercial</h2>
+    <div id="funil-comercial"></div>
+  </div>
+
+  <div class="card">
+    <h2>Ocupação do portfólio</h2>
+    <div id="ocupacao-resumo"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Composição do mix de inquilinos</h2>
+    </div>
+    <table>
+      <thead><tr><th>Segmento</th><th>Inquilino (razão social)</th><th>Marca / Operação</th><th>Lojas</th></tr></thead>
+      <tbody id="tbl-mix"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Ocupadas -->
+<div class="panel" id="ocupadas">
+  <div class="card">
+    <div class="card-head">
+      <h2 id="ocupadas-titulo">Lojas ocupadas</h2>
+      <button class="btn" id="btn-novo-contrato">+ Novo contrato</button>
+    </div>
+    <div class="sub" style="margin-bottom:12px;color:var(--ink-soft)">
+      Dados extraídos diretamente dos contratos assinados (Quadros Resumo). Clique no PDF para abrir o contrato. Botões de ação por linha.
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Loja</th><th>Inquilino</th><th>Área (m²)</th><th>Aluguel/mês</th><th>Venc.</th><th>Prazo</th>
+          <th>Reajuste</th><th>Garantia</th><th>Início → Término</th><th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-ocup"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Disponíveis -->
+<div class="panel" id="disponiveis">
+  <div class="card">
+    <div class="card-head">
+      <h2 id="disponiveis-titulo">Lojas disponíveis para locação</h2>
+      <button class="btn outline" id="btn-editar-areas">📏 Editar características das lojas</button>
+    </div>
+    <div class="sub" style="margin-bottom:12px;color:var(--ink-soft)" id="disponiveis-sub"></div>
+    <table>
+      <thead><tr><th>Loja</th><th>Status</th><th>m²</th><th>Depósito</th><th>Exaustão</th><th>Pipeline</th></tr></thead>
+      <tbody id="tbl-disp"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Inquilinos -->
+<div class="panel" id="inquilinos">
+  <div class="card">
+    <div class="card-head">
+      <h2 id="inquilinos-titulo">Inquilinos ativos</h2>
+      <button class="btn outline" id="btn-novo-inquilino">+ Novo inquilino</button>
+    </div>
+    <div id="tenant-list"></div>
+  </div>
+</div>
+
+<!-- Leads (CRM) -->
+<div class="panel" id="leads">
+  <div class="card">
+    <div class="card-head">
+      <h2 id="leads-titulo">Leads — clientes acompanhando, antes da proposta formal</h2>
+      <button class="btn" id="btn-novo-lead">+ Novo lead</button>
+    </div>
+    <div class="sub" style="margin-bottom:14px;color:var(--ink-soft)">
+      Acompanhe clientes que demonstraram interesse mas ainda não fizeram proposta. Quando o cliente decidir formalizar, use o botão "Converter em proposta" no lead.
+    </div>
+    <div class="financeiro-subtabs" id="leads-filtros" style="margin-bottom:14px">
+      <button class="fin-subtab active" data-lead-filtro="ativos">Ativos <span id="cnt-lead-ativos"></span></button>
+      <button class="fin-subtab" data-lead-filtro="interessado">Interessados <span id="cnt-lead-interessado"></span></button>
+      <button class="fin-subtab" data-lead-filtro="visitou">Visitaram <span id="cnt-lead-visitou"></span></button>
+      <button class="fin-subtab" data-lead-filtro="em_analise">Em análise <span id="cnt-lead-analise"></span></button>
+      <button class="fin-subtab" data-lead-filtro="virou_proposta">Viraram proposta <span id="cnt-lead-virou"></span></button>
+      <button class="fin-subtab" data-lead-filtro="desistiu">Desistiram <span id="cnt-lead-desistiu"></span></button>
+      <button class="fin-subtab" data-lead-filtro="all">Todos <span id="cnt-lead-todos"></span></button>
+    </div>
+    <div id="leads-resumo" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px"></div>
+    <div id="leads-list"></div>
+  </div>
+</div>
+
+<!-- Propostas -->
+<div class="panel" id="propostas">
+  <div class="card">
+    <div class="card-head">
+      <h2 id="propostas-titulo">Propostas ativas — pendentes de decisão ou documentação</h2>
+      <button class="btn" id="btn-nova-proposta">+ Nova proposta</button>
+    </div>
+    <div class="sub" style="margin-bottom:14px;color:var(--ink-soft)">
+      Cada card representa uma proposta. Referências de R$/m²: portfólio R$ 176 (médio ponderado) · conservador R$ 152 · âncora Pague Menos R$ 193.
+    </div>
+    <div class="financeiro-subtabs" id="propostas-filtros" style="margin-bottom:14px">
+      <button class="fin-subtab active" data-prop-filtro="ativas">Ativas <span id="cnt-prop-ativas"></span></button>
+      <button class="fin-subtab" data-prop-filtro="aceita_aguardando_docs">Aceitas <span id="cnt-prop-aceitas"></span></button>
+      <button class="fin-subtab" data-prop-filtro="em_analise">Em análise <span id="cnt-prop-analise"></span></button>
+      <button class="fin-subtab" data-prop-filtro="recusada">Recusadas <span id="cnt-prop-recusadas"></span></button>
+      <button class="fin-subtab" data-prop-filtro="expirada">Expiradas <span id="cnt-prop-expiradas"></span></button>
+      <button class="fin-subtab" data-prop-filtro="convertida_em_contrato">Convertidas <span id="cnt-prop-convertidas"></span></button>
+      <button class="fin-subtab" data-prop-filtro="all">Todas <span id="cnt-prop-todas"></span></button>
+    </div>
+    <div id="propostas-resumo" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px"></div>
+    <div id="propostas-list"></div>
+  </div>
+</div>
+
+<!-- Financeiro -->
+<div class="panel" id="financeiro">
+  <div class="card">
+    <div class="card-head">
+      <h2>💰 Controle financeiro</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="month" id="financeiro-mes" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px">
+        <button class="btn outline" id="btn-financeiro-mes-anterior">‹</button>
+        <button class="btn outline" id="btn-financeiro-mes-proximo">›</button>
+        <!-- Botão "Gerar cobranças do mês" removido: SIENGE é fonte oficial; cobranças vêm do PDF importado pela ficha do contrato -->
+        <span style="font-size:11px;color:#94a3b8;font-style:italic">Cobranças vêm do SIENGE — reimporte o PDF pra atualizar status</span>
+      </div>
+    </div>
+    <div class="financeiro-subtabs" id="financeiro-subtabs">
+      <button class="fin-subtab active" data-fintab="cobrancas">Mês corrente</button>
+      <button class="fin-subtab" data-fintab="inadimplencia">Inadimplência <span id="fin-cnt-inad"></span></button>
+      <button class="fin-subtab" data-fintab="despesas">Despesas</button>
+      <button class="fin-subtab" data-fintab="reajustes">Reajustes</button>
+      <button class="fin-subtab" data-fintab="resumo">Resumo / DRE</button>
+    </div>
+    <div id="fin-conteudo"></div>
+  </div>
+</div>
+
+<!-- Vencimentos -->
+<div class="panel" id="vencimentos">
+
+  <div class="card">
+    <h2>Linha do tempo de vencimentos contratuais</h2>
+    <div class="sub" style="margin-bottom:14px;color:var(--ink-soft)">
+      Cada barra representa a duração total do contrato. A linha vermelha marca a data de hoje. Contratos &gt;= 120 meses em âmbar; parciais em violeta.
+    </div>
+    <div class="timeline-labels">
+      <div>Inquilino</div><div>Vigência</div><div>Vence em</div>
+    </div>
+    <div id="timeline-rows"></div>
+    <div class="timeline-scale" id="timeline-scale"></div>
+  </div>
+
+  <div class="card">
+    <h2>Tabela detalhada de prazos</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Inquilino</th><th>Lojas</th><th>Assinatura</th><th>Início vigência</th>
+          <th>Prazo</th><th>Término</th><th>Meses restantes</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-venc"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Alertas -->
+<div class="panel" id="alertas">
+  <div class="card">
+    <h2>Alertas &amp; pendências</h2>
+    <div id="alertas-list"></div>
+  </div>
+
+  <!-- Legenda: regras de notificação automática -->
+  <div class="card" style="border-left:4px solid var(--accent)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="font-size:22px">🔔</span>
+      <h2 style="margin:0">Regras de notificação automática</h2>
+    </div>
+    <div class="sub" style="margin-bottom:16px;color:var(--ink-soft);font-size:13px">
+      O sistema gera alertas automáticos com base nos contratos, documentos cadastrados, leads e propostas. As regras abaixo definem quando cada tipo de alerta é disparado e com qual urgência.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:16px">
+
+      <div style="padding:14px;background:#f8fafc;border:1px solid var(--line);border-radius:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <span style="font-size:16px">📄</span>
+          <strong style="color:#1e40af;font-size:13px;text-transform:uppercase;letter-spacing:0.05em">Contratual</strong>
+        </div>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink)">
+          <li><strong>Renovação de contrato</strong> — aviso disparado <strong>180, 90, 60 e 30 dias</strong> antes do término.</li>
+          <li><strong>Reajuste anual</strong> — aviso <strong>30, 15 e 7 dias</strong> antes do aniversário do contrato.</li>
+          <li><strong>Marco de 5 anos</strong> — gatilho da <strong>ação renovatória</strong> (Lei 8.245/91).</li>
+        </ul>
+      </div>
+
+      <div style="padding:14px;background:#f8fafc;border:1px solid var(--line);border-radius:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <span style="font-size:16px">📋</span>
+          <strong style="color:#a16207;font-size:13px;text-transform:uppercase;letter-spacing:0.05em">Documental</strong>
+        </div>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink)">
+          <li><strong>Seguros</strong> (fiança, incêndio) — aviso <strong>60, 30, 15 e 7 dias</strong> antes do vencimento da apólice.</li>
+          <li><strong>Certidões negativas</strong> (federal, municipal, estadual, trabalhista) — mesma régua. Vencidas há até 30d continuam aparecendo.</li>
+          <li><strong>AVCB</strong> e <strong>alvará</strong> de funcionamento — mesma régua.</li>
+          <li><strong>Vistorias</strong> (inicial / final) — alerta quando a validade se aproxima.</li>
+        </ul>
+        <div style="margin-top:8px;font-size:11px;color:var(--ink-soft);font-style:italic">Cadastre documentos editando cada contrato → seção &quot;Documentos do contrato&quot;.</div>
+      </div>
+
+      <div style="padding:14px;background:#f8fafc;border:1px solid var(--line);border-radius:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <span style="font-size:16px">💼</span>
+          <strong style="color:#15803d;font-size:13px;text-transform:uppercase;letter-spacing:0.05em">Comercial</strong>
+        </div>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink)">
+          <li><strong>Lead parado</strong> — sem interação registrada há mais de <strong>30 dias</strong>. Após 60d vira urgência alta.</li>
+          <li><strong>Proposta aceita aguardando documentação</strong> — quando passa de <strong>7 dias</strong> sem fechar contrato.</li>
+          <li><strong>Proposta em análise parada</strong> — sem decisão do cliente há mais de <strong>14 dias</strong>.</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div style="padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:8px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);font-weight:600;margin-bottom:8px">Régua de urgência</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">🔴 Crítico</span>
+        <span style="font-size:12px;color:var(--ink-soft)">vencimento ≤ 7 dias (ou já vencido)</span>
+        <span style="margin:0 4px;color:#cbd5e1">·</span>
+        <span style="background:#ffedd5;color:#c2410c;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">🟠 Alto</span>
+        <span style="font-size:12px;color:var(--ink-soft)">≤ 30 dias</span>
+        <span style="margin:0 4px;color:#cbd5e1">·</span>
+        <span style="background:#fef9c3;color:#a16207;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">🟡 Médio</span>
+        <span style="font-size:12px;color:var(--ink-soft)">≤ 60–90 dias</span>
+        <span style="margin:0 4px;color:#cbd5e1">·</span>
+        <span style="background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">🟢 Baixo</span>
+        <span style="font-size:12px;color:var(--ink-soft)">monitoramento (180 dias)</span>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;font-size:11px;color:var(--ink-soft);font-style:italic">
+      Os alertas ficam disponíveis no Chat IA — pergunte &quot;tem seguro vencendo?&quot;, &quot;quem precisa renovar?&quot; — e em breve em sininho dedicado e e-mail diário às 8h.
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- Modal full-screen pra mapa -->
+<div id="mapa-fullscreen" class="mapa-fs" style="display:none">
+  <div class="mapa-fs-header">
+    <h2>🗺️ Mapa do empreendimento — Tela cheia</h2>
+    <button class="btn outline" id="btn-mapa-fechar">✕ Fechar</button>
+  </div>
+  <div class="mapa-fs-body">
+    <div class="grid" id="grid-fs"></div>
+    <div class="legend" id="legend-fs"></div>
+  </div>
+</div>
+
+<!-- Container de toasts -->
+<div id="toast-container"></div>
+
+<!-- Chat widget flutuante (canto inferior direito) -->
+<div id="chat-widget" class="chat-widget">
+  <button class="chat-widget-trigger" id="chat-widget-trigger" aria-label="Abrir chat com IA">
+    <span class="chat-widget-icon"><span class="chat-widget-ia">IA</span><span class="chat-widget-x">×</span></span>
+    <span class="chat-widget-pulse"></span>
+  </button>
+  <div class="chat-widget-painel" id="chat-widget-painel">
+    <div class="chat-widget-header">
+      <div class="chat-widget-titulo">
+        <span class="chat-widget-avatar">✨</span>
+        <div>
+          <div class="chat-widget-nome">Claude · Assistente IA</div>
+          <div class="chat-widget-status-txt">Pergunte sobre o portfólio</div>
+        </div>
+      </div>
+      <button class="chat-widget-close" id="chat-widget-close" aria-label="Fechar">×</button>
+    </div>
+    <div class="chat-widget-body">
+      <div id="chat-widget-mensagens"></div>
+    </div>
+    <div class="chat-widget-sugestoes-box">
+      <div id="chat-widget-sugestoes"></div>
+    </div>
+    <form id="chat-widget-form" class="chat-widget-form">
+      <textarea id="chat-widget-input" placeholder="Pergunte algo..." rows="1"></textarea>
+      <button type="submit" id="chat-widget-enviar" aria-label="Enviar">↑</button>
+    </form>
+  </div>
+</div>
+
+<!-- App bootstrap — BUILD 20260623A (cache bust pós-recovery) -->
+<script type="module">
+import { requireAuth, getCurrentUser, signOut } from './js/auth.js';
+import { setState, getState } from './js/state.js'; // state global compartilhado (substitui window._*)
+import { renderTudo, mostrarToast } from './js/render.js';
+import { abrirFormContrato } from './js/forms-contrato.js';
+import { abrirFormProposta } from './js/forms-proposta.js';
+import { abrirFormInquilino } from './js/forms-inquilino.js';
+import { abrirFormAreasLojas } from './js/forms-lojas.js';
+import { abrirFormLead } from './js/forms-lead.js';
+import { abrirFormDespesa, abrirFormFornecedor } from './js/forms-financeiro.js';
+import { renderFinanceiro, setFinSubtab, setFinMes } from './js/financeiro-view.js';
+import { initChatWidget } from './js/chat-widget.js';
+import { abrirAdminUsuarios } from './js/forms-admin.js';
+import { getMeuPapel } from './js/data-layer.js';
+
+// 1. Verifica autenticação
+await requireAuth();
+
+// 2. Carrega usuário
+const user = await getCurrentUser();
+document.getElementById('user-nome').textContent = user?.nome || user?.email || '—';
+document.getElementById('today').textContent = new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+
+// 3. Logout
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await signOut();
+  window.location.href = './login.html';
+});
+
+// 3.1 Mostrar botão Admin só se o usuário for admin
+(async () => {
+  try {
+    const papel = await getMeuPapel();
+    if (papel === 'admin') {
+      const btnAdmin = document.getElementById('btn-admin');
+      btnAdmin.style.display = '';
+      btnAdmin.addEventListener('click', () => abrirAdminUsuarios());
+    }
+  } catch (e) { /* fail silently — usuário sem papel não vê admin */ }
+})();
+
+// 4. Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.panel).classList.add('active');
+    if (tab.dataset.panel === 'financeiro') renderFinanceiro();
+  });
+});
+
+// 4.5 Sub-tabs da aba Financeiro
+document.querySelectorAll('.fin-subtab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.fin-subtab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    setFinSubtab(t.dataset.fintab);
+  });
+});
+const inpMes = document.getElementById('financeiro-mes');
+const mesAtual = new Date().toISOString().slice(0, 7);
+if (inpMes) {
+  inpMes.value = mesAtual;
+  inpMes.addEventListener('change', () => setFinMes(inpMes.value));
+}
+document.getElementById('btn-financeiro-mes-anterior')?.addEventListener('click', () => {
+  const [a,m] = inpMes.value.split('-').map(Number);
+  const d = new Date(a, m - 2, 1);
+  inpMes.value = d.toISOString().slice(0, 7);
+  setFinMes(inpMes.value);
+});
+document.getElementById('btn-financeiro-mes-proximo')?.addEventListener('click', () => {
+  const [a,m] = inpMes.value.split('-').map(Number);
+  const d = new Date(a, m, 1);
+  inpMes.value = d.toISOString().slice(0, 7);
+  setFinMes(inpMes.value);
+});
+// Botão "Gerar cobranças do mês" foi REMOVIDO — SIENGE é fonte oficial das cobranças.
+// O handler foi deixado neutro pra evitar erro caso algum elemento legado dispare o evento.
+
+// 5. Botoes CRUD
+document.getElementById('btn-novo-contrato').addEventListener('click', () => abrirFormContrato());
+document.getElementById('btn-novo-inquilino').addEventListener('click', () => abrirFormInquilino());
+document.getElementById('btn-editar-areas').addEventListener('click', () => abrirFormAreasLojas());
+document.getElementById('btn-novo-lead').addEventListener('click', () => abrirFormLead());
+document.getElementById('btn-nova-proposta').addEventListener('click', () => abrirFormProposta());
+
+// 5.6 Filtros da aba Propostas
+document.querySelectorAll('[data-prop-filtro]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('[data-prop-filtro]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    setState('propostasFiltro', btn.dataset.propFiltro);
+    const { renderTudo } = await import('./js/render.js');
+    await renderTudo();
+  });
+});
+
+// 5.7 Filtros da aba Leads
+document.querySelectorAll('[data-lead-filtro]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('[data-lead-filtro]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    setState('leadsFiltro', btn.dataset.leadFiltro);
+    const { renderTudo } = await import('./js/render.js');
+    await renderTudo();
+  });
+});
+
+// 5.5 Mapa em tela cheia
+// IMPORTANTE: limpa o #grid original pra evitar IDs duplicados no DOM
+// (os SVGs e o #planta-handles existem dentro do grid; manter dois quebra getElementById)
+document.getElementById('btn-mapa-fullscreen').addEventListener('click', () => {
+  const fs = document.getElementById('mapa-fullscreen');
+  const gridOrig = document.getElementById('grid');
+  // Esvazia o grid original pra evitar #planta-handles duplicado no DOM
+  gridOrig.innerHTML = '';
+  import('./js/render.js').then(({ renderTudo }) => {
+    fs.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    setState('mapaFullscreenAtivo', true);
+    renderTudo();
+  });
+});
+document.getElementById('btn-mapa-fechar').addEventListener('click', async () => {
+  document.getElementById('mapa-fullscreen').style.display = 'none';
+  document.body.style.overflow = '';
+  setState('mapaFullscreenAtivo', false);
+  const { renderTudo } = await import('./js/render.js');
+  renderTudo();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && getState('mapaFullscreenAtivo')) {
+    document.getElementById('btn-mapa-fechar')?.click();
+  }
+});
+
+// 6. Render inicial
+await renderTudo();
+
+// 6.5 Inicializa chat widget flutuante
+initChatWidget();
+
+// 7. Service Worker (PWA)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js').catch(err => console.warn('SW:', err));
+}
+</script>
+</body>
+</html>
