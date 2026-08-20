@@ -11,7 +11,7 @@ import { getSupabase } from './supabase-client.js';
 import { abrirModal } from './modal.js';
 import { el } from './utils.js';
 import { renderTudo, mostrarToast } from './render.js';
-import { getCtxEmp } from './contexto.js';
+import { getCtxEmp, getCtxId } from './contexto.js';
 
 const TIPOS = [
   { v: 'loja',          label: 'Loja',        finalidade: 'comercial'   },
@@ -152,6 +152,57 @@ export async function abrirFormAreasLojas() {
   });
   body.appendChild(lista);
 
+  // ===== Adicionar unidades novas ao empreendimento =====
+  const novas = [];
+  const tipoPadrao = (emp?.preset === 'galpao_logistico') ? 'galpao'
+                   : (emp?.preset === 'residencial_multifamiliar') ? 'apartamento'
+                   : 'loja';
+  const proximoCodigo = () => {
+    const todos = lojas.map(l => l.codigo).concat(novas.map(n => n.inpCod.value));
+    const nums = todos.map(c => parseInt(String(c).replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
+    const prox = (nums.length ? Math.max(...nums) : 0) + 1;
+    const pad = Math.max(2, String(prox).length);
+    return String(prox).padStart(pad, '0');
+  };
+  const btnAdd = el('button', {
+    type: 'button', className: 'btn outline sm',
+    style: { marginTop: '10px', fontSize: '12px' }
+  }, '＋ Adicionar unidade');
+  btnAdd.addEventListener('click', () => {
+    const reg = { atrInputs: {}, nova: true };
+    const linha = el('div', {
+      style: { display: 'grid', gridTemplateColumns: GRID, gap: '8px', alignItems: 'center', padding: '6px 8px', borderBottom: '1px solid #f1f5f9', background: '#f0fdf4' }
+    });
+    const inpCod = el('input', { value: proximoCodigo(), style: { ...inpStyle, fontWeight: '600', width: '100%', padding: '4px 6px' } });
+    const selTipo = el('select', { style: { ...inpStyle, padding: '5px 6px' } });
+    TIPOS.forEach(t => {
+      const opt = el('option', { value: t.v }, t.label);
+      if (t.v === tipoPadrao) opt.selected = true;
+      selTipo.appendChild(opt);
+    });
+    const inpPriv  = el('input', { type: 'number', step: '0.01', placeholder: '0,00', style: inpStyle });
+    const inpTotal = el('input', { type: 'number', step: '0.01', placeholder: '0,00', style: inpStyle });
+    const atrCell = el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } });
+    renderAtributos(atrCell, tipoPadrao, {}, reg);
+    selTipo.addEventListener('change', () => renderAtributos(atrCell, selTipo.value, coletarAtributos(reg, {}), reg));
+
+    reg.inpCod = inpCod; reg.selTipo = selTipo; reg.inpPriv = inpPriv; reg.inpTotal = inpTotal;
+    novas.push(reg);
+
+    const btnRem = el('button', { type: 'button', title: 'Remover', style: { border: 'none', background: 'transparent', cursor: 'pointer', color: '#dc2626', fontSize: '14px' } }, '✕');
+    btnRem.addEventListener('click', () => { novas.splice(novas.indexOf(reg), 1); linha.remove(); });
+
+    linha.appendChild(inpCod);
+    linha.appendChild(selTipo);
+    linha.appendChild(inpPriv);
+    linha.appendChild(inpTotal);
+    linha.appendChild(atrCell);
+    linha.appendChild(btnRem);
+    lista.appendChild(linha);
+    lista.scrollTop = lista.scrollHeight;
+  });
+  body.appendChild(btnAdd);
+
   const total = lojas.length;
   const comArea = lojas.filter(l => l.area_privativa).length;
   body.appendChild(el('div', {
@@ -193,9 +244,31 @@ export async function abrirFormAreasLojas() {
         updates.push({ id: l.id, codigo: l.codigo, payload });
       });
 
-      if (updates.length === 0) {
+      // Inserção das unidades novas (carimbadas no empreendimento em contexto —
+      // o trigger de default apontaria pro primeiro empreendimento, que pode não ser este)
+      const inserts = novas
+        .filter(reg => reg.inpCod.value.trim())
+        .map(reg => {
+          const t = reg.selTipo.value;
+          return {
+            codigo: reg.inpCod.value.trim(),
+            tipo: t,
+            finalidade: (TIPOS.find(x => x.v === t) || {}).finalidade || 'comercial',
+            area_privativa: reg.inpPriv.value ? Number(reg.inpPriv.value) : null,
+            area_total: reg.inpTotal.value ? Number(reg.inpTotal.value) : null,
+            atributos: coletarAtributos(reg, {}),
+            uso_interno: false,
+            empreendimento_id: getCtxId()
+          };
+        });
+
+      if (updates.length === 0 && inserts.length === 0) {
         mostrarToast('Nenhuma alteração para salvar', 'info');
         return;
+      }
+      if (inserts.length > 0) {
+        const { error: errIns } = await supa.from('lojas').insert(inserts);
+        if (errIns) throw new Error('Erro ao criar unidades: ' + errIns.message);
       }
       let salvas = 0;
       for (const u of updates) {
@@ -204,7 +277,10 @@ export async function abrirFormAreasLojas() {
         if (error) throw new Error(`Erro na unidade ${u.codigo}: ${error.message}`);
         salvas++;
       }
-      mostrarToast(`${salvas} unidade${salvas > 1 ? 's' : ''} atualizada${salvas > 1 ? 's' : ''}`, 'success');
+      const partes = [];
+      if (inserts.length) partes.push(`${inserts.length} criada${inserts.length > 1 ? 's' : ''}`);
+      if (salvas) partes.push(`${salvas} atualizada${salvas > 1 ? 's' : ''}`);
+      mostrarToast('Unidades: ' + partes.join(' · '), 'success');
       await renderTudo();
     }
   });
