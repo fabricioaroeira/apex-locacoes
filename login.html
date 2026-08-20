@@ -89,7 +89,7 @@ import { signIn, isLogged, MOCK_MODE } from './js/auth.js';
 
 // Se já está logado, manda pro app
 if (await isLogged()) {
-  window.location.href = './index.html';
+  window.location.href = './portfolio.html';
 }
 
 const form = document.getElementById('login-form');
@@ -107,7 +107,7 @@ form.addEventListener('submit', async (e) => {
 
   try {
     await signIn(email, senha);
-    window.location.href = './index.html';
+    window.location.href = './portfolio.html';
   } catch (err) {
     erro.textContent = err.message || 'Email ou senha incorretos.';
     erro.classList.add('show');

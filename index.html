@@ -21,16 +21,18 @@
 <body>
 <div class="wrap">
 
-<header>
+<header id="app-header">
   <div class="header-brand">
-    <img src="./imgs/logo-union511.png" alt="Union 511 Residence Mall" class="logo">
+    <img src="./imgs/logo-union511.png" alt="Logo do empreendimento" class="logo" id="emp-logo">
     <div class="titles">
-      <h1>Painel de Controle</h1>
-      <div class="sub">CRNW 511, Setor Noroeste, Brasília/DF · 52 lojas · 80 vagas</div>
+      <h1 id="emp-nome">Painel de Controle</h1>
+      <div class="sub" id="emp-sub">Carregando…</div>
     </div>
+    <span id="ctx-seletor"></span>
   </div>
   <div class="user-menu">
     <span class="meta">Atualizado em <strong id="today"></strong></span>
+    <button id="btn-portfolio" title="Voltar ao portfólio" style="display:none">⌂ Portfólio</button>
     <span class="nome" id="user-nome">—</span>
     <button id="btn-admin" title="Administração de usuários" style="display:none">⚙️ Admin</button>
     <button id="btn-logout">Sair</button>
@@ -390,9 +392,40 @@ import { renderFinanceiro, setFinSubtab, setFinMes } from './js/financeiro-view.
 import { initChatWidget } from './js/chat-widget.js';
 import { abrirAdminUsuarios } from './js/forms-admin.js';
 import { getMeuPapel } from './js/data-layer.js';
+import { initContexto, listEmpreendimentos, montarSeletor } from './js/contexto.js';
 
 // 1. Verifica autenticação
 await requireAuth();
+
+// 1.5 Resolve o EMPREENDIMENTO em contexto (Etapa B — multi-portfólio).
+//     Precisa acontecer antes de qualquer carga de dados: a data-layer
+//     filtra todas as queries pelo contexto atual.
+const empAtual = await initContexto();
+if (empAtual) {
+  document.title = `${empAtual.nome} — Apex Locações`;
+  document.getElementById('emp-nome').textContent = empAtual.nome;
+  const temVagas = (empAtual.vagas || 0) > 0;
+  document.getElementById('emp-sub').textContent = [
+    [empAtual.endereco, empAtual.cidade && empAtual.uf ? `${empAtual.cidade}/${empAtual.uf}` : empAtual.cidade].filter(Boolean).join(', '),
+    `${empAtual.unidades} unidades${temVagas ? ` · ${empAtual.vagas} vagas` : ''}`
+  ].filter(Boolean).join(' · ');
+  // Faixa de contexto: a cor do empreendimento marca o header
+  document.getElementById('app-header').style.borderBottomColor = empAtual.cor || '';
+  // Logo: por enquanto só o Union 511 tem imagem; os demais escondem
+  const logo = document.getElementById('emp-logo');
+  if (empAtual.slug !== 'union-511') logo.style.display = 'none';
+  montarSeletor(document.getElementById('ctx-seletor'));
+  // Botão Portfólio aparece quando há mais de um empreendimento
+  listEmpreendimentos().then(emps => {
+    if (emps.length > 1) {
+      const btn = document.getElementById('btn-portfolio');
+      btn.style.display = '';
+      btn.addEventListener('click', () => { window.location.href = './portfolio.html'; });
+    }
+  }).catch(() => {});
+} else {
+  document.getElementById('emp-sub').textContent = 'Nenhum empreendimento acessível para este usuário.';
+}
 
 // 2. Carrega usuário
 const user = await getCurrentUser();

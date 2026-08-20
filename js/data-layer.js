@@ -17,6 +17,23 @@
 
 import { MOCK_MODE, getSupabase, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase-client.js';
 import { parseBR, addMonths, fmtBR } from './utils.js';
+import { getCtxId } from './contexto.js';
+
+// ---------------------------------------------------------------------
+// ESCOPO DE EMPREENDIMENTO (Etapa B)
+// Toda leitura de entidade "raiz" filtra pelo empreendimento em contexto;
+// toda escrita carimba o empreendimento. O RLS no banco é a segunda camada
+// (segurança); isto aqui é a primeira (contexto de navegação).
+// ---------------------------------------------------------------------
+function empEq(q) {
+  const id = getCtxId();
+  return id ? q.eq('empreendimento_id', id) : q;
+}
+function empStamp(payload) {
+  const id = getCtxId();
+  if (id && !payload.empreendimento_id) payload.empreendimento_id = id;
+  return payload;
+}
 
 // ---------------------------------------------------------------------
 // SEED inicial (espelha o estado atual do dashboard)
@@ -137,7 +154,7 @@ export async function getLojasStatus() {
     return out;
   } else {
     const supa = await getSupabase();
-    const { data, error } = await supa.from('v_lojas_status').select('*').order('id');
+    const { data, error } = await empEq(supa.from('v_lojas_status').select('*')).order('id');
     if (error) throw error;
     return data;
   }
@@ -167,6 +184,12 @@ export async function getKPIs() {
     };
   } else {
     const supa = await getSupabase();
+    const ctx = getCtxId();
+    if (ctx) {
+      const { data, error } = await supa.from('v_kpis_emp').select('*').eq('empreendimento_id', ctx).single();
+      if (error) throw error;
+      return data;
+    }
     const { data, error } = await supa.from('v_kpis').select('*').single();
     if (error) throw error;
     return data;
@@ -235,7 +258,7 @@ export async function getContratos(statusFilter = 'ativo') {
       });
   } else {
     const supa = await getSupabase();
-    let q = supa.from('v_contratos_completo').select('*');
+    let q = empEq(supa.from('v_contratos_completo').select('*'));
     if (statusFilter !== 'all') q = q.eq('status', statusFilter);
     const { data } = await q;
     if (!data) return data;
@@ -316,7 +339,7 @@ export async function saveContrato(input) {
     } else {
       // Remove campos null/undefined/vazios pra deixar o default do banco atuar (ex: id = gen_random_uuid())
       const payload = Object.fromEntries(Object.entries(contratoBase).filter(([_, v]) => v !== null && v !== undefined && v !== ''));
-      const { data, error } = await supa.from('contratos').insert(payload).select().single();
+      const { data, error } = await supa.from('contratos').insert(empStamp(payload)).select().single();
       if (error) throw new Error('Erro ao criar contrato: ' + (error.message || JSON.stringify(error)));
       contrato = data;
     }
@@ -358,7 +381,7 @@ export async function getPropostas(statusFilter = 'ativas') {
     }));
   } else {
     const supa = await getSupabase();
-    let q = supa.from('v_propostas_completo').select('*');
+    let q = empEq(supa.from('v_propostas_completo').select('*'));
     if (statusFilter === 'ativas') q = q.in('status', ['em_analise','em_negociacao','aceita_aguardando_docs']);
     else if (statusFilter !== 'all') q = q.eq('status', statusFilter);
     const { data } = await q;
@@ -397,7 +420,7 @@ export async function saveProposta(input) {
       await supa.from('proposta_lojas').delete().eq('proposta_id', input.id);
     } else {
       const payload = Object.fromEntries(Object.entries(base).filter(([_, v]) => v !== null && v !== undefined && v !== ''));
-      const { data, error } = await supa.from('propostas').insert(payload).select().single();
+      const { data, error } = await supa.from('propostas').insert(empStamp(payload)).select().single();
       if (error) throw new Error('Erro ao criar proposta: ' + error.message);
       prop = data;
     }
@@ -489,7 +512,7 @@ export async function getLeads(statusFilter = 'ativos') {
     return lista;
   }
   const supa = await getSupabase();
-  let q = supa.from('v_leads_completo').select('*');
+  let q = empEq(supa.from('v_leads_completo').select('*'));
   if (statusFilter === 'ativos') q = q.in('status', ['interessado','visitou','em_analise']);
   else if (statusFilter !== 'todos') q = q.eq('status', statusFilter);
   const { data, error } = await q.order('updated_at', { ascending: false });
@@ -532,7 +555,7 @@ export async function saveLead(input) {
     await supa.from('lead_lojas').delete().eq('lead_id', input.id);
   } else {
     const payload = Object.fromEntries(Object.entries(base).filter(([_, v]) => v !== null && v !== undefined && v !== ''));
-    const { data, error } = await supa.from('leads').insert(payload).select().single();
+    const { data, error } = await supa.from('leads').insert(empStamp(payload)).select().single();
     if (error) throw new Error('Erro ao criar lead: ' + error.message);
     lead = data;
   }
@@ -603,7 +626,7 @@ export async function getCobrancas(filtros) {
   const status = filtros && filtros.status;
   const contrato_id = filtros && filtros.contrato_id;
   const supa = await getSupabase();
-  let q = supa.from('v_cobrancas_completo').select('*');
+  let q = empEq(supa.from('v_cobrancas_completo').select('*'));
   if (mes) {
     const inicio = mes + '-01';
     const fimDate = new Date(mes + '-01T00:00:00');
@@ -707,7 +730,7 @@ export async function getDespesas(filtros) {
   const status = filtros && filtros.status;
   const categoria = filtros && filtros.categoria;
   const supa = await getSupabase();
-  let q = supa.from('despesas').select('*, fornecedores(nome, categoria)');
+  let q = empEq(supa.from('despesas').select('*, fornecedores(nome, categoria)'));
   if (mes) {
     const inicio = mes + '-01';
     const fimDate = new Date(mes + '-01T00:00:00');
@@ -731,7 +754,7 @@ export async function saveDespesa(input) {
     if (error) throw new Error('Erro ao atualizar despesa: ' + error.message);
     return data;
   }
-  const { data, error } = await supa.from('despesas').insert(payload).select().single();
+  const { data, error } = await supa.from('despesas').insert(empStamp(payload)).select().single();
   if (error) throw new Error('Erro ao criar despesa: ' + error.message);
   return data;
 }

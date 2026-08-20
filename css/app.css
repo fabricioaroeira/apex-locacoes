@@ -600,3 +600,16 @@ tr:hover td{background:#fafbfc}
 .clausula-label{font-weight:600;color:#64748b}
 .clausula-valor{color:#1e293b}
 .clausula-vazia{font-size:11px;color:#cbd5e1;font-style:italic}
+
+/* ===== Seletor de contexto de empreendimento (Etapa B) ===== */
+.ctx-chip{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);
+  border-radius:999px;padding:5px 12px;font-size:13px;color:#fff;margin-left:6px
+}
+.ctx-chip select{
+  background:transparent;border:none;color:#fff;font:inherit;cursor:pointer;
+  padding-right:2px;outline:none;max-width:220px
+}
+.ctx-chip select option{color:#2c2c2a}
+#btn-portfolio{border-color:rgba(255,255,255,.3)}
