@@ -1,7 +1,7 @@
 {
-  "name": "Union 511 — Gestão de Locação",
-  "short_name": "Union 511",
-  "description": "Painel de gestão comercial do Edifício Union 511 Noroeste",
+  "name": "Apex Locações — Gestão de Portfólio",
+  "short_name": "Apex Locações",
+  "description": "Plataforma de gestão de locação multi-empreendimento da Apex Engenharia",
   "start_url": "./",
   "display": "standalone",
   "orientation": "any",

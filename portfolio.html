@@ -12,9 +12,9 @@
 <style>
 :root{
   --bg:#f7f6f3; --card:#fff; --ink:#2c2c2a; --ink-soft:#5f5e5a; --ink-mute:#8b8a85;
-  --line:#e6e3db; --apex:#33322f;
+  --line:#e6e3db; --line-strong:#d8d4c9; --apex:#33322f;
   --good:#15803d; --good-soft:#dcfce7; --warn:#a16207; --warn-soft:#fef3c7;
-  --crit:#b91c1c; --crit-soft:#fee2e2;
+  --crit:#b91c1c; --crit-soft:#fee2e2; --accent:#eb6834;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px;padding:24px}
@@ -28,7 +28,10 @@ header{display:flex;justify-content:space-between;align-items:center;padding:14p
 .who b{display:block;color:#fff;font-weight:500}
 .who button{background:transparent;border:1px solid rgba(255,255,255,.3);color:rgba(255,255,255,.9);font:inherit;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer}
 .who button:hover{background:rgba(255,255,255,.12)}
-h2{font-family:'Outfit';font-weight:300;font-size:22px;margin-bottom:14px}
+.topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+h2{font-family:'Outfit';font-weight:300;font-size:22px}
+.btn-novo{background:var(--apex);color:#fff;border:none;font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;display:none}
+.btn-novo:hover{background:#4a4945}
 .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 15px}
 .kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-mute);font-weight:500}
@@ -56,6 +59,34 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px;margin-bottom:14px}
 .b.good{background:var(--good-soft);color:var(--good)}
 .b.mute{background:#efede7;color:var(--ink-soft)}
 .loading{color:var(--ink-mute);padding:40px;text-align:center}
+
+/* ===== Wizard ===== */
+.wiz-back{position:fixed;inset:0;background:rgba(30,29,26,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:100;overflow:auto}
+.wiz-back.on{display:flex}
+.wiz{background:#fff;border-radius:14px;max-width:760px;width:100%;padding:22px 24px 24px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.wiz h3{font-family:'Outfit';font-weight:400;font-size:18px;margin-bottom:4px}
+.wiz .passo{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-mute);margin-bottom:16px}
+.presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.preset{border:1.5px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;background:#fff}
+.preset:hover{border-color:var(--line-strong)}
+.preset.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(235,104,52,.13)}
+.preset .ic{font-size:19px}
+.preset h4{font-size:13.5px;margin:7px 0 3px}
+.preset p{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:4px}
+.fld label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-mute);font-weight:600;margin-bottom:5px}
+.fld input,.fld select{width:100%;background:#fff;border:1px solid var(--line-strong);border-radius:7px;padding:9px 11px;font:inherit;font-size:13px}
+.fld input:focus,.fld select:focus{outline:2px solid rgba(235,104,52,.35);border-color:var(--accent)}
+.cores{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px}
+.cor{width:26px;height:26px;border-radius:8px;cursor:pointer;border:2px solid transparent}
+.cor.sel{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.wiz-foot{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.wiz-foot .obs{font-size:11.5px;color:var(--ink-mute);max-width:55%}
+.wiz-foot .acts{display:flex;gap:8px}
+.wbtn{font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;border:1px solid var(--line-strong);background:#fff}
+.wbtn.pri{background:var(--apex);color:#fff;border-color:var(--apex)}
+.wbtn.pri:disabled{opacity:.5;cursor:default}
+.wiz-erro{color:var(--crit);font-size:12.5px;margin-top:10px;display:none}
 @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -73,15 +104,62 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px;margin-bottom:14px}
   </div>
 </header>
 
-<h2>Portfólio</h2>
+<div class="topo">
+  <h2>Portfólio</h2>
+  <button class="btn-novo" id="btn-novo-emp">＋ Novo empreendimento</button>
+</div>
 <div class="kpis" id="kpis"></div>
 <div class="grid" id="cards"><div class="loading">Carregando empreendimentos…</div></div>
 
 </div>
 
+<!-- ===== Wizard de novo empreendimento ===== -->
+<div class="wiz-back" id="wiz-back">
+  <div class="wiz">
+    <h3 id="wiz-titulo">Novo empreendimento</h3>
+    <div class="passo" id="wiz-passo">Passo 1 de 3 · Tipologia</div>
+
+    <div id="wiz-p1">
+      <div class="presets" id="wiz-presets"></div>
+    </div>
+
+    <div id="wiz-p2" style="display:none">
+      <div class="frm">
+        <div class="fld" style="grid-column:1/-1"><label>Nome do empreendimento</label><input id="w-nome" placeholder="Ex.: Galpões Apex — Cidade Ocidental"></div>
+        <div class="fld"><label>Endereço</label><input id="w-endereco" placeholder="Rua / rodovia, número"></div>
+        <div class="fld"><label>Cidade</label><input id="w-cidade" placeholder="Brasília"></div>
+        <div class="fld"><label>UF</label><input id="w-uf" maxlength="2" placeholder="DF"></div>
+        <div class="fld"><label>Proprietária (locadora)</label><input id="w-prop" placeholder="Razão social"></div>
+        <div class="fld" style="grid-column:1/-1"><label>Cor de identificação</label><div class="cores" id="w-cores"></div></div>
+      </div>
+    </div>
+
+    <div id="wiz-p3" style="display:none">
+      <div class="frm">
+        <div class="fld"><label>Quantidade de unidades</label><input id="w-qtd" type="number" min="1" max="500" value="6"></div>
+        <div class="fld"><label>Primeiro código</label><input id="w-cod1" value="01"></div>
+        <div class="fld"><label>Área privativa padrão (m²)</label><input id="w-area" type="number" min="0" step="0.01" placeholder="opcional"></div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-mute);margin-top:12px">As unidades são criadas em sequência a partir do primeiro código (01, 02, 03…). Área, matrícula e atributos específicos podem ser ajustados depois, unidade a unidade, dentro do empreendimento.</p>
+    </div>
+
+    <div class="wiz-erro" id="wiz-erro"></div>
+
+    <div class="wiz-foot">
+      <span class="obs" id="wiz-obs"></span>
+      <span class="acts">
+        <button class="wbtn" id="wiz-cancelar">Cancelar</button>
+        <button class="wbtn" id="wiz-voltar" style="display:none">← Voltar</button>
+        <button class="wbtn pri" id="wiz-avancar" disabled>Avançar →</button>
+      </span>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { requireAuth, getCurrentUser, signOut } from './js/auth.js';
 import { listEmpreendimentos, setCtxId } from './js/contexto.js';
+import { getSupabase } from './js/supabase-client.js';
 
 const fmtBRL = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const PRESET_LABEL = {
@@ -92,38 +170,85 @@ const PRESET_LABEL = {
   avulso: 'Unidade avulsa'
 };
 
+// ---------------------------------------------------------------------
+// Presets do wizard — cada um define o comportamento padrão do
+// empreendimento (config JSONB) e o tipo das unidades geradas.
+// ---------------------------------------------------------------------
+const PRESETS = [
+  { key:'comercial_rua', ic:'🏬', nome:'Comercial de rua', desc:'Lojas em edifício, como o Union 511.',
+    tipo:'loja', finalidade:'comercial', cor:'#eb6834',
+    config:{ planta_baixa:false, prazo_padrao_meses:60, indice_padrao:'IGP-M', tem_vagas:true,
+             nomenclatura_unidade:'Loja', nomenclatura_unidades:'Lojas',
+             label_ocupadas:'Lojas Alugadas', label_disponiveis:'Lojas Disponíveis' } },
+  { key:'galpao_logistico', ic:'🏭', nome:'Galpão logístico', desc:'Poucas unidades grandes, contratos longos.',
+    tipo:'galpao', finalidade:'comercial', cor:'#2a78d6',
+    config:{ planta_baixa:false, prazo_padrao_meses:120, indice_padrao:'IGP-M', tem_vagas:false,
+             nomenclatura_unidade:'Galpão', nomenclatura_unidades:'Galpões',
+             label_ocupadas:'Galpões Ocupados', label_disponiveis:'Galpões Disponíveis' } },
+  { key:'residencial_multifamiliar', ic:'🏢', nome:'Residencial multifamiliar', desc:'Apartamentos em um ou mais blocos.',
+    tipo:'apartamento', finalidade:'residencial', cor:'#1baf7a',
+    config:{ planta_baixa:false, prazo_padrao_meses:30, indice_padrao:'IGP-M', tem_vagas:false,
+             nomenclatura_unidade:'Apartamento', nomenclatura_unidades:'Apartamentos',
+             label_ocupadas:'Apartamentos Alugados', label_disponiveis:'Apartamentos Disponíveis' } },
+  { key:'misto', ic:'🏙️', nome:'Misto', desc:'Lojas e apartamentos no mesmo prédio.',
+    tipo:'loja', finalidade:'mista', cor:'#eda100',
+    config:{ planta_baixa:false, prazo_padrao_meses:60, indice_padrao:'IGP-M', tem_vagas:false,
+             nomenclatura_unidade:'Unidade', nomenclatura_unidades:'Unidades',
+             label_ocupadas:'Unidades Ocupadas', label_disponiveis:'Unidades Disponíveis' } },
+  { key:'avulso', ic:'🔑', nome:'Unidade avulsa', desc:'Um imóvel só, sem prédio a administrar.',
+    tipo:'apartamento', finalidade:'residencial', cor:'#4a3aa7', qtdFixa:1,
+    config:{ planta_baixa:false, prazo_padrao_meses:30, indice_padrao:'IGP-M', tem_vagas:false, avulso:true,
+             nomenclatura_unidade:'Unidade', nomenclatura_unidades:'Unidades',
+             label_ocupadas:'Unidades Ocupadas', label_disponiveis:'Unidades Disponíveis' } },
+];
+const CORES = ['#eb6834','#2a78d6','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'];
+
+// ---------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------
+let _user = null;
+
 async function boot() {
   await requireAuth();
-  const user = await getCurrentUser();
-  document.getElementById('user-nome').textContent = user?.nome || user?.email || '—';
+  _user = await getCurrentUser();
+  document.getElementById('user-nome').textContent = _user?.nome || _user?.email || '—';
   document.getElementById('btn-logout').addEventListener('click', async () => {
     await signOut(); location.href = './login.html';
   });
 
+  const stay = new URLSearchParams(location.search).has('stay');
   const emps = await listEmpreendimentos(true);
 
-  // Um empreendimento só? Entra direto no app (o portfólio vira relevante
-  // quando o segundo imóvel for cadastrado).
-  if (emps.length === 1) {
+  // Um empreendimento e nenhum pedido explícito de ficar? Entra direto no app.
+  if (emps.length === 1 && !stay) {
     setCtxId(emps[0].empreendimento_id);
     location.replace('./index.html');
     return;
   }
 
-  // KPIs consolidados
-  const receita  = emps.reduce((s, e) => s + Number(e.receita_mes || 0), 0);
-  const unid     = emps.reduce((s, e) => s + (e.unidades || 0), 0);
-  const ocup     = emps.reduce((s, e) => s + (e.unidades_ocupadas || 0), 0);
-  const contr    = emps.reduce((s, e) => s + (e.contratos_ativos || 0), 0);
-  const venc90   = emps.reduce((s, e) => s + (e.vencendo_90d || 0), 0);
+  // Botão de novo empreendimento: só admin
+  if (_user?.role === 'admin') {
+    const b = document.getElementById('btn-novo-emp');
+    b.style.display = '';
+    b.addEventListener('click', abrirWizard);
+  }
+
+  renderPortfolio(emps);
+}
+
+function renderPortfolio(emps) {
+  const receita = emps.reduce((s, e) => s + Number(e.receita_mes || 0), 0);
+  const unid    = emps.reduce((s, e) => s + (e.unidades || 0), 0);
+  const ocup    = emps.reduce((s, e) => s + (e.unidades_ocupadas || 0), 0);
+  const contr   = emps.reduce((s, e) => s + (e.contratos_ativos || 0), 0);
+  const venc90  = emps.reduce((s, e) => s + (e.vencendo_90d || 0), 0);
   document.getElementById('kpis').innerHTML = `
-    <div class="kpi"><div class="l">Receita mensal</div><div class="v">${fmtBRL(receita)}</div><div class="s">${emps.length} empreendimentos</div></div>
+    <div class="kpi"><div class="l">Receita mensal</div><div class="v">${fmtBRL(receita)}</div><div class="s">${emps.length} empreendimento${emps.length !== 1 ? 's' : ''}</div></div>
     <div class="kpi"><div class="l">Unidades</div><div class="v">${unid}</div><div class="s">portfólio inteiro</div></div>
     <div class="kpi"><div class="l">Ocupação global</div><div class="v">${unid ? Math.round(ocup / unid * 100) : 0}%</div><div class="s">${ocup} de ${unid} ocupadas</div></div>
     <div class="kpi"><div class="l">Contratos ativos</div><div class="v">${contr}</div><div class="s">${venc90} vencem em 90 dias</div></div>
     <div class="kpi"><div class="l">Propostas ativas</div><div class="v">${emps.reduce((s, e) => s + (e.propostas_ativas || 0), 0)}</div><div class="s">em análise ou aceitas</div></div>`;
 
-  // Cards
   document.getElementById('cards').innerHTML = emps.map(e => {
     const pct = e.unidades ? Math.round(e.unidades_ocupadas / e.unidades * 100) : 0;
     const temVagas = (e.vagas || 0) > 0;
@@ -151,6 +276,128 @@ async function boot() {
     </a>`;
   }).join('');
 }
+
+// ---------------------------------------------------------------------
+// Wizard
+// ---------------------------------------------------------------------
+const wiz = { passo: 1, preset: null, cor: null };
+const $ = id => document.getElementById(id);
+
+function abrirWizard() {
+  wiz.passo = 1; wiz.preset = null; wiz.cor = null;
+  $('wiz-presets').innerHTML = PRESETS.map(p => `
+    <div class="preset" data-k="${p.key}"><div class="ic">${p.ic}</div><h4>${p.nome}</h4><p>${p.desc}</p></div>`).join('');
+  $('wiz-presets').querySelectorAll('.preset').forEach(el => el.addEventListener('click', () => {
+    $('wiz-presets').querySelectorAll('.preset').forEach(x => x.classList.remove('sel'));
+    el.classList.add('sel');
+    wiz.preset = PRESETS.find(p => p.key === el.dataset.k);
+    $('wiz-avancar').disabled = false;
+  }));
+  $('w-cores').innerHTML = CORES.map(c => `<span class="cor" data-c="${c}" style="background:${c}"></span>`).join('');
+  $('w-cores').querySelectorAll('.cor').forEach(el => el.addEventListener('click', () => {
+    $('w-cores').querySelectorAll('.cor').forEach(x => x.classList.remove('sel'));
+    el.classList.add('sel'); wiz.cor = el.dataset.c;
+  }));
+  mostrarPasso(1);
+  $('wiz-back').classList.add('on');
+}
+
+function mostrarPasso(n) {
+  wiz.passo = n;
+  const nomes = { 1: 'Tipologia', 2: 'Identificação', 3: 'Unidades' };
+  $('wiz-passo').textContent = `Passo ${n} de 3 · ${nomes[n]}`;
+  $('wiz-p1').style.display = n === 1 ? '' : 'none';
+  $('wiz-p2').style.display = n === 2 ? '' : 'none';
+  $('wiz-p3').style.display = n === 3 ? '' : 'none';
+  $('wiz-voltar').style.display = n > 1 ? '' : 'none';
+  $('wiz-avancar').textContent = n === 3 ? 'Criar empreendimento' : 'Avançar →';
+  $('wiz-avancar').disabled = (n === 1 && !wiz.preset);
+  $('wiz-erro').style.display = 'none';
+  $('wiz-obs').textContent = n === 3 && wiz.preset?.qtdFixa
+    ? 'Unidade avulsa: cria 1 unidade — os detalhes você preenche na ficha.'
+    : (n === 2 ? 'A cor identifica o empreendimento no portfólio e no cabeçalho do app.' : '');
+  if (n === 3 && wiz.preset?.qtdFixa) { $('w-qtd').value = 1; $('w-qtd').disabled = true; }
+  else if (n === 3) { $('w-qtd').disabled = false; }
+  if (n === 2 && !wiz.cor) {
+    const el = $('w-cores').querySelector(`[data-c="${wiz.preset.cor}"]`);
+    if (el) { el.classList.add('sel'); wiz.cor = wiz.preset.cor; }
+  }
+}
+
+function slugify(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
+async function criarEmpreendimento() {
+  const nome = $('w-nome').value.trim();
+  if (!nome) throw new Error('Dê um nome ao empreendimento (passo 2).');
+  const qtd = wiz.preset.qtdFixa || Math.max(1, Math.min(500, parseInt($('w-qtd').value, 10) || 1));
+  const cod1 = ($('w-cod1').value.trim() || '01');
+  const area = parseFloat($('w-area').value) || null;
+
+  const supa = await getSupabase();
+  const emps = await listEmpreendimentos();
+  let slug = slugify(nome);
+  if (emps.some(e => e.slug === slug)) slug = slug + '-' + Date.now().toString(36).slice(-4);
+
+  // 1. Empreendimento
+  const { data: emp, error: e1 } = await supa.from('empreendimentos').insert({
+    nome, slug, preset: wiz.preset.key, finalidade: wiz.preset.finalidade,
+    cor: wiz.cor || wiz.preset.cor,
+    endereco: $('w-endereco').value.trim() || null,
+    cidade: $('w-cidade').value.trim() || null,
+    uf: $('w-uf').value.trim().toUpperCase() || null,
+    proprietaria: $('w-prop').value.trim() || null,
+    ordem: emps.length + 1,
+    config: wiz.preset.config
+  }).select().single();
+  if (e1) throw new Error('Erro ao criar empreendimento: ' + e1.message);
+
+  // 2. Vínculo do criador como proprietário
+  const { error: e2 } = await supa.from('usuario_empreendimento')
+    .insert({ user_id: _user.id || _user.user_id, empreendimento_id: emp.id, papel: 'proprietario' });
+  if (e2 && !String(e2.message).includes('duplicate')) console.warn('vinculo:', e2.message);
+
+  // 3. Unidades em sequência a partir do primeiro código
+  const pad = cod1.length;
+  const inicio = parseInt(cod1.replace(/\D/g, ''), 10) || 1;
+  const prefixo = cod1.replace(/\d+$/, '');
+  const unidades = Array.from({ length: qtd }, (_, i) => ({
+    codigo: prefixo + String(inicio + i).padStart(Math.max(1, pad - prefixo.length), '0'),
+    area_privativa: area, area_total: area,
+    uso_interno: false,
+    tipo: wiz.preset.tipo, finalidade: wiz.preset.finalidade,
+    empreendimento_id: emp.id
+  }));
+  const { error: e3 } = await supa.from('lojas').insert(unidades);
+  if (e3) throw new Error('Empreendimento criado, mas houve erro ao gerar as unidades: ' + e3.message);
+
+  return emp;
+}
+
+$('wiz-cancelar').addEventListener('click', () => $('wiz-back').classList.remove('on'));
+$('wiz-voltar').addEventListener('click', () => mostrarPasso(wiz.passo - 1));
+$('wiz-avancar').addEventListener('click', async () => {
+  if (wiz.passo < 3) {
+    if (wiz.passo === 2 && !$('w-nome').value.trim()) {
+      $('wiz-erro').textContent = 'Dê um nome ao empreendimento.'; $('wiz-erro').style.display = ''; return;
+    }
+    mostrarPasso(wiz.passo + 1); return;
+  }
+  const btn = $('wiz-avancar');
+  btn.disabled = true; btn.textContent = 'Criando…';
+  try {
+    await criarEmpreendimento();
+    $('wiz-back').classList.remove('on');
+    const emps = await listEmpreendimentos(true);
+    renderPortfolio(emps);
+  } catch (err) {
+    $('wiz-erro').textContent = err.message; $('wiz-erro').style.display = '';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Criar empreendimento';
+  }
+});
 
 boot().catch(err => {
   console.error(err);

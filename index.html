@@ -6,10 +6,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Union 511">
+<meta name="apple-mobile-web-app-title" content="Apex Locações">
 <!-- CSP básico: restringe scripts/estilos a self + CDNs conhecidos + endpoints Supabase/Anthropic -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.anthropic.com; frame-src 'self' blob:;">
-<title>Union 511 — Gestão de Locação</title>
+<title>Apex Locações</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -415,12 +415,33 @@ if (empAtual) {
   const logo = document.getElementById('emp-logo');
   if (empAtual.slug !== 'union-511') logo.style.display = 'none';
   montarSeletor(document.getElementById('ctx-seletor'));
-  // Botão Portfólio aparece quando há mais de um empreendimento
-  listEmpreendimentos().then(emps => {
-    if (emps.length > 1) {
+
+  // ===== Etapa C: comportamento por preset (config do empreendimento) =====
+  const cfg = empAtual.config || {};
+  // Planta baixa: só quem tem planta cadastrada exibe o mapa
+  if (cfg.planta_baixa !== true) {
+    const cm = document.getElementById('card-mapa');
+    if (cm) cm.style.display = 'none';
+    const bm = document.getElementById('btn-mapa-fullscreen');
+    if (bm) bm.style.display = 'none';
+  } else {
+    const h2m = document.querySelector('#card-mapa h2');
+    if (h2m) h2m.textContent = `Mapa do empreendimento — ${empAtual.unidades} ${String(cfg.nomenclatura_unidades || 'unidades').toLowerCase()}`;
+  }
+  // Nomenclatura das abas segue o preset (Lojas / Galpões / Apartamentos / Unidades)
+  const setTab = (panel, txt) => {
+    const b = document.querySelector(`.tab[data-panel="${panel}"]`);
+    if (b && txt) b.childNodes[0].textContent = txt + ' ';
+  };
+  setTab('ocupadas', cfg.label_ocupadas);
+  setTab('disponiveis', cfg.label_disponiveis);
+
+  // Botão Portfólio: sempre para admin; para os demais, quando houver 2+ empreendimentos
+  Promise.all([listEmpreendimentos(), getMeuPapel().catch(() => null)]).then(([emps, papel]) => {
+    if (emps.length > 1 || papel === 'admin') {
       const btn = document.getElementById('btn-portfolio');
       btn.style.display = '';
-      btn.addEventListener('click', () => { window.location.href = './portfolio.html'; });
+      btn.addEventListener('click', () => { window.location.href = './portfolio.html?stay=1'; });
     }
   }).catch(() => {});
 } else {
