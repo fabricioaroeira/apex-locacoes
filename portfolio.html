@@ -160,6 +160,7 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px}
 import { requireAuth, getCurrentUser, signOut } from './js/auth.js';
 import { listEmpreendimentos, setCtxId } from './js/contexto.js';
 import { getSupabase } from './js/supabase-client.js';
+import { getMeuPapel } from './js/data-layer.js';
 
 const fmtBRL = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const PRESET_LABEL = {
@@ -226,12 +227,17 @@ async function boot() {
     return;
   }
 
-  // Botão de novo empreendimento: só admin
-  if (_user?.role === 'admin') {
-    const b = document.getElementById('btn-novo-emp');
-    b.style.display = '';
-    b.addEventListener('click', abrirWizard);
-  }
+  // Botão de novo empreendimento: só admin.
+  // Usa a MESMA checagem do botão Admin do app (RPC user_role) — o caminho
+  // via perfil espalhado no getCurrentUser se mostrou menos confiável.
+  try {
+    const papel = _user?.role === 'admin' ? 'admin' : await getMeuPapel();
+    if (papel === 'admin') {
+      const b = document.getElementById('btn-novo-emp');
+      b.style.display = '';
+      b.addEventListener('click', abrirWizard);
+    }
+  } catch (e) { console.warn('papel:', e); }
 
   renderPortfolio(emps);
 }

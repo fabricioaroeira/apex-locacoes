@@ -441,7 +441,7 @@ if (empAtual) {
     if (emps.length > 1 || papel === 'admin') {
       const btn = document.getElementById('btn-portfolio');
       btn.style.display = '';
-      btn.addEventListener('click', () => { window.location.href = './portfolio.html?stay=1'; });
+      btn.addEventListener('click', () => { window.location.href = './portfolio.html?stay=1&r=' + Date.now(); });
     }
   }).catch(() => {});
 } else {
