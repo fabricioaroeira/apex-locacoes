@@ -6,8 +6,10 @@ import { el } from './utils.js';
 import { mostrarToast } from './render.js';
 import {
   getUsuarios, atualizarPapelUsuario, atualizarAtivoUsuario, getMeuPapel,
-  criarUsuario, alterarSenhaUsuario, alterarNomeUsuario, excluirUsuario
+  criarUsuario, alterarSenhaUsuario, alterarNomeUsuario, excluirUsuario,
+  getVinculos, salvarVinculo, removerVinculo
 } from './data-layer.js';
+import { listEmpreendimentos } from './contexto.js';
 
 const LABELS_ROLE = {
   admin:        { txt: 'Admin',        cor: '#7c3aed', bg: '#f3e8ff' },
@@ -15,6 +17,20 @@ const LABELS_ROLE = {
   corretor:     { txt: 'Corretor',     cor: '#15803d', bg: '#dcfce7' },
   visualizador: { txt: 'Visualizador', cor: '#64748b', bg: '#f1f5f9' }
 };
+
+// Papéis com escopo de empreendimento (tabela usuario_empreendimento).
+// Hoje o papel GLOBAL é quem decide as permissões de escrita; estes definem
+// a QUAIS empreendimentos a pessoa tem acesso (e ficam prontos para a
+// granularidade fina prevista no documento executivo).
+const PAPEIS_EMP = [
+  ['gerente',         'Gerente'],
+  ['financeiro',      'Financeiro'],
+  ['corretor',        'Corretor'],
+  ['contabilidade',   'Contabilidade'],
+  ['manutencao',      'Manutenção'],
+  ['admin_portfolio', 'Admin de portfólio'],
+  ['proprietario',    'Proprietário'],
+];
 
 export async function abrirAdminUsuarios() {
   const papel = await getMeuPapel();
@@ -85,6 +101,9 @@ function renderItemUsuario(u, body) {
   const btnSenha = el('button', { type: 'button', className: 'btn ghost sm', style: 'font-size:10px;padding:3px 8px' }, '🔑 Senha');
   btnSenha.onclick = () => abrirFormSenha(u);
   acoes.appendChild(btnSenha);
+  const btnAcessos = el('button', { type: 'button', className: 'btn ghost sm', style: 'font-size:10px;padding:3px 8px' }, '🏢 Acessos');
+  btnAcessos.onclick = () => abrirFormAcessos(u);
+  acoes.appendChild(btnAcessos);
   const btnExcluir = el('button', { type: 'button', className: 'btn ghost sm', style: 'font-size:10px;padding:3px 8px;color:#dc2626' }, '🗑️ Excluir');
   btnExcluir.onclick = () => confirmarExcluir(u, body);
   acoes.appendChild(btnExcluir);
@@ -198,6 +217,121 @@ function abrirFormNovoUsuario(parentBody) {
       await renderListaUsuarios(parentBody);
     }
   });
+}
+
+// =====================================================================
+// Acessos por empreendimento (Etapa D)
+// =====================================================================
+async function abrirFormAcessos(u) {
+  const body = el('div');
+  body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--ink-soft)">⏳ Carregando empreendimentos...</div>';
+
+  abrirModal({
+    titulo: '🏢 Acessos de ' + (u.nome || u.email || 'usuário'),
+    body,
+    submitLabel: 'Fechar',
+    maxWidth: '640px',
+    onSubmit: async () => {}
+  });
+
+  try {
+    const [emps, vinculos] = await Promise.all([listEmpreendimentos(true), getVinculos(u.user_id)]);
+    const mapa = {};
+    vinculos.forEach(v => { mapa[v.empreendimento_id] = v.papel; });
+    body.innerHTML = '';
+
+    const ehAdminGlobal = u.role === 'admin';
+    const aviso = el('div', {
+      style: 'padding:11px 13px;border-radius:7px;margin-bottom:14px;font-size:12px;line-height:1.5;' +
+        (ehAdminGlobal
+          ? 'background:#f3e8ff;border:1px solid #ddd0f5;color:#5b21b6'
+          : 'background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af')
+    });
+    aviso.innerHTML = ehAdminGlobal
+      ? '<strong>Este usuário é Admin global.</strong> Admins enxergam <strong>todos</strong> os empreendimentos, com ou sem vínculo aqui. Os acessos abaixo só passam a limitar de fato se o papel global dele deixar de ser Admin.'
+      : 'O papel <strong>global</strong> (na lista anterior) define <strong>o que</strong> a pessoa pode fazer. Os acessos abaixo definem <strong>em quais empreendimentos</strong>. Sem nenhum acesso marcado, o usuário não vê dado nenhum.';
+    body.appendChild(aviso);
+
+    if (!emps.length) {
+      body.appendChild(el('div', { style: 'padding:20px;text-align:center;color:var(--ink-soft);font-size:13px' },
+        'Nenhum empreendimento cadastrado ainda.'));
+      return;
+    }
+
+    const lista = el('div', { style: 'display:flex;flex-direction:column;gap:8px' });
+    emps.forEach(e => lista.appendChild(renderLinhaAcesso(u, e, mapa[e.empreendimento_id])));
+    body.appendChild(lista);
+  } catch (err) {
+    body.innerHTML = '<div style="padding:20px;color:#991b1b">Erro: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function renderLinhaAcesso(u, emp, papelAtual) {
+  const linha = el('div', {
+    style: 'padding:11px 13px;background:#fff;border:1px solid var(--line);border-radius:8px;' +
+           'display:grid;grid-template-columns:22px 1fr 170px;gap:11px;align-items:center'
+  });
+
+  const cb = el('input', { type: 'checkbox', style: 'width:17px;height:17px;cursor:pointer' });
+  cb.checked = papelAtual != null;
+
+  const info = el('div', { style: 'min-width:0' });
+  const titulo = el('div', { style: 'display:flex;align-items:center;gap:7px' });
+  titulo.appendChild(el('span', { style: 'width:9px;height:9px;border-radius:3px;flex:none;background:' + (emp.cor || '#8b8a85') }));
+  titulo.appendChild(el('span', { style: 'font-weight:600;font-size:13px' }, emp.nome));
+  info.appendChild(titulo);
+  info.appendChild(el('div', { style: 'font-size:11px;color:var(--ink-soft);margin-top:2px' },
+    [emp.cidade && emp.uf ? emp.cidade + '/' + emp.uf : emp.cidade, emp.unidades + ' unidades'].filter(Boolean).join(' · ')));
+  info.appendChild(el('div', { className: 'acesso-status', style: 'font-size:11px;margin-top:3px;color:#94a3b8' }, ''));
+
+  const sel = el('select', { style: 'padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;width:100%' });
+  PAPEIS_EMP.forEach(([v, txt]) => {
+    const opt = el('option', { value: v }, txt);
+    if (v === (papelAtual || 'gerente')) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.disabled = !cb.checked;
+  sel.style.opacity = cb.checked ? '1' : '.45';
+
+  const statusEl = info.querySelector('.acesso-status');
+  const feedback = (txt, cor) => {
+    statusEl.textContent = txt;
+    statusEl.style.color = cor;
+    if (txt) setTimeout(() => { if (statusEl.textContent === txt) statusEl.textContent = ''; }, 2500);
+  };
+
+  cb.onchange = async () => {
+    const marcado = cb.checked;
+    cb.disabled = true;
+    try {
+      if (marcado) await salvarVinculo(u.user_id, emp.empreendimento_id, sel.value);
+      else await removerVinculo(u.user_id, emp.empreendimento_id);
+      sel.disabled = !marcado;
+      sel.style.opacity = marcado ? '1' : '.45';
+      feedback(marcado ? '✓ acesso concedido' : '✓ acesso removido', '#15803d');
+    } catch (err) {
+      cb.checked = !marcado;
+      mostrarToast('Erro: ' + err.message, 'error');
+    }
+    cb.disabled = false;
+  };
+
+  sel.onchange = async () => {
+    if (!cb.checked) return;
+    sel.disabled = true;
+    try {
+      await salvarVinculo(u.user_id, emp.empreendimento_id, sel.value);
+      feedback('✓ papel atualizado', '#15803d');
+    } catch (err) {
+      mostrarToast('Erro: ' + err.message, 'error');
+    }
+    sel.disabled = false;
+  };
+
+  linha.appendChild(cb);
+  linha.appendChild(info);
+  linha.appendChild(sel);
+  return linha;
 }
 
 function abrirFormSenha(u) {

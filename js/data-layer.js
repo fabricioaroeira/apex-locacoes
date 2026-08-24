@@ -1411,6 +1411,44 @@ export async function atualizarPapelUsuario(userId, novoPapel) {
   if (error) throw new Error('Erro ao atualizar papel: ' + error.message);
 }
 
+// =====================================================================
+// VÍNCULOS usuário ↔ empreendimento (Etapa D)
+// O papel GLOBAL (perfis.role) decide O QUE a pessoa pode fazer;
+// o vínculo decide EM QUAIS empreendimentos. Quem é admin global
+// enxerga todos os empreendimentos independentemente de vínculo
+// (ver função meus_empreendimentos() no banco).
+// =====================================================================
+
+/** Vínculos de um usuário: [{ empreendimento_id, papel }] */
+export async function getVinculos(userId) {
+  if (MOCK_MODE) return [];
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('usuario_empreendimento')
+    .select('empreendimento_id, papel')
+    .eq('user_id', userId);
+  if (error) throw new Error('Erro ao buscar acessos: ' + error.message);
+  return data || [];
+}
+
+/** Cria ou atualiza o vínculo (PK composta user_id+empreendimento_id) */
+export async function salvarVinculo(userId, empreendimentoId, papel) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('usuario_empreendimento')
+    .upsert({ user_id: userId, empreendimento_id: empreendimentoId, papel },
+            { onConflict: 'user_id,empreendimento_id' });
+  if (error) throw new Error('Erro ao salvar acesso: ' + error.message);
+}
+
+/** Remove o acesso de um usuário a um empreendimento */
+export async function removerVinculo(userId, empreendimentoId) {
+  if (MOCK_MODE) return;
+  const supa = await getSupabase();
+  const { error } = await supa.from('usuario_empreendimento')
+    .delete().eq('user_id', userId).eq('empreendimento_id', empreendimentoId);
+  if (error) throw new Error('Erro ao remover acesso: ' + error.message);
+}
+
 // Ativa/desativa usuário (sem deletar a conta no Supabase Auth)
 export async function atualizarAtivoUsuario(userId, ativo) {
   if (MOCK_MODE) return;
