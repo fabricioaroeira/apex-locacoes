@@ -9,6 +9,7 @@ import {
   getReceitaConsolidadaPortfolio, getInadimplenciaSienge
 } from './data-layer.js';
 import { getArquivoUrl } from './upload.js';
+import { getCtxEmp } from './contexto.js';
 import { abrirModal , promptCustom} from './modal.js';
 import {
   formatMoney, formatMoneyShort, formatPercent, formatArea,
@@ -106,32 +107,38 @@ function renderKpis(k, receitaConsol, lojas = []) {
     ? 'igual à cobrança real'
     : (diff > 0 ? `+${formatMoneyShort(diff)} (${diffPct.toFixed(1)}%)` : `−${formatMoneyShort(Math.abs(diff))} (${diffPct.toFixed(1)}%)`);
 
+  // Nomenclatura vem do empreendimento em contexto (Loja / Galpão / Apartamento…)
+  const _cfg = getCtxEmp()?.config || {};
+  const U  = _cfg.nomenclatura_unidade  || 'Unidade';
+  const Us = _cfg.nomenclatura_unidades || 'Unidades';
+  const temVagas = (getCtxEmp()?.vagas || 0) > 0;
+
   document.getElementById('kpis').innerHTML = `
     <div class="kpi accent">
-      <div class="kpi-label">Lojas totais</div>
+      <div class="kpi-label">${Us} totais</div>
       <div class="kpi-value">${k.total_lojas}</div>
-      <div class="kpi-sub">Lojas 01–${String(k.total_lojas).padStart(2,'0')}</div>
+      <div class="kpi-sub">${Us} 01–${String(k.total_lojas).padStart(2,'0')}</div>
     </div>
     <div class="kpi green">
       <div class="kpi-label">Ocupadas</div>
       <div class="kpi-value">${k.lojas_ocupadas}</div>
-      <div class="kpi-sub">${formatPercent(pctOcup)} de ${k.lojas_locaveis} locáveis (${k.lojas_internas} em uso JAX)</div>
+      <div class="kpi-sub">${formatPercent(pctOcup)} de ${k.lojas_locaveis} locáveis${k.lojas_internas ? ` (${k.lojas_internas} em uso interno)` : ''}</div>
     </div>
     <div class="kpi amber">
       <div class="kpi-label">Disponíveis</div>
       <div class="kpi-value">${disp}</div>
-      <div class="kpi-sub">de ${k.lojas_locaveis} locáveis (${k.lojas_internas} em uso JAX)</div>
+      <div class="kpi-sub">de ${k.lojas_locaveis} locáveis${k.lojas_internas ? ` (${k.lojas_internas} em uso interno)` : ''}</div>
     </div>
     <div class="kpi green">
       <div class="kpi-label">Área locada (ABL)</div>
       <div class="kpi-value">${formatPercent(pctArea)}</div>
-      <div class="kpi-sub">${fmtM2(areaLocada)} m² de ${fmtM2(areaTotalEmp)} m² (todas as ${k.total_lojas} lojas)</div>
+      <div class="kpi-sub">${fmtM2(areaLocada)} m² de ${fmtM2(areaTotalEmp)} m² (todas as ${k.total_lojas} ${Us.toLowerCase()})</div>
     </div>
-    <div class="kpi">
+    ${temVagas ? `<div class="kpi">
       <div class="kpi-label">Vagas comerciais</div>
       <div class="kpi-value">${k.vagas_ocupadas} / ${k.vagas_comerciais_total}</div>
       <div class="kpi-sub">${formatPercent(k.vagas_ocupadas / k.vagas_comerciais_total * 100)}</div>
-    </div>
+    </div>` : ''}
   
     <div class="kpi">
       <div class="kpi-label">Inquilinos ativos</div>

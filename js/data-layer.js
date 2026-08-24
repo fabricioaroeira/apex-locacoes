@@ -682,7 +682,7 @@ export async function marcarCobrancaParcial(cobrancaId, pagamento) {
 export async function getInadimplencia() {
   if (MOCK_MODE) return [];
   const supa = await getSupabase();
-  const { data, error } = await supa.from('v_inadimplencia').select('*').order('dias_atraso', { ascending: false });
+  const { data, error } = await empEq(supa.from('v_inadimplencia').select('*')).order('dias_atraso', { ascending: false });
   if (error) throw new Error('Erro ao buscar inadimplencia: ' + error.message);
   return data || [];
 }
@@ -852,7 +852,7 @@ export async function getDREMensal(filtros) {
   const inicio = filtros && filtros.inicio;
   const fim = filtros && filtros.fim;
   const supa = await getSupabase();
-  let q = supa.from('v_dre_mensal').select('*');
+  let q = empEq(supa.from('v_dre_mensal').select('*'));
   if (inicio) q = q.gte('mes', inicio);
   if (fim) q = q.lte('mes', fim);
   const { data, error } = await q.order('mes', { ascending: false });
@@ -919,7 +919,8 @@ export async function getDocumentosTodos() {
   if (MOCK_MODE) return [];
   const supa = await getSupabase();
   const { data, error } = await supa.from('documentos_contrato')
-    .select('*, contratos(id, inquilino_id, inquilinos(razao_social, nome_fantasia))')
+    .select('*, contratos!inner(id, inquilino_id, empreendimento_id, inquilinos(razao_social, nome_fantasia))')
+    .eq('contratos.empreendimento_id', getCtxId())
     .order('data_validade');
   if (error) throw new Error('Erro ao buscar documentos: ' + error.message);
   return (data || []).map(d => {
@@ -969,6 +970,7 @@ export async function getOcorrenciasPendentesGlobal() {
              gestoes_contrato!inner(titulo, tipo, descricao, clausula_origem, categoria),
              contratos!inner(id, inquilinos!inner(nome_fantasia, razao_social))`)
     .eq('status', 'pendente')
+    .eq('contratos.empreendimento_id', getCtxId())
     .order('data_prevista', { ascending: true });
   if (error) {
     if (/relation .* does not exist|Could not find the table|schema cache/i.test(error.message)) return [];
@@ -1036,6 +1038,7 @@ export async function getGestoesAtivas() {
       )
     `)
     .eq('ativo', true)
+    .eq('contratos.empreendimento_id', getCtxId())
     .not('data_evento', 'is', null)
     .order('data_evento', { ascending: true });
   if (error) throw new Error('Erro ao carregar gestões: ' + error.message);
@@ -1515,8 +1518,8 @@ export async function getReceitaConsolidadaPortfolio() {
   if (MOCK_MODE) return { total_sienge: 0, total_estimado: 0, total_geral: 0, total_contratual: 0, contratos: [] };
   const supa = await getSupabase();
   const [contratos, saldos] = await Promise.all([
-    supa.from('v_contratos_completo').select('id, nome_fantasia, razao_social, valor_aluguel, valor_base').eq('status', 'ativo'),
-    supa.from('v_saldo_sienge_por_contrato').select('contrato_id, tem_sienge, valor_mes_atual')
+    empEq(supa.from('v_contratos_completo').select('id, nome_fantasia, razao_social, valor_aluguel, valor_base')).eq('status', 'ativo'),
+    empEq(supa.from('v_saldo_sienge_por_contrato').select('contrato_id, tem_sienge, valor_mes_atual'))
   ]);
   const saldoMap = {};
   (saldos.data || []).forEach(s => { saldoMap[s.contrato_id] = s; });
