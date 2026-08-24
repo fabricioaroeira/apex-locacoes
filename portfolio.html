@@ -234,7 +234,9 @@ async function boot() {
     const papel = _user?.role === 'admin' ? 'admin' : await getMeuPapel();
     if (papel === 'admin') {
       const b = document.getElementById('btn-novo-emp');
-      b.style.display = '';
+      // display explícito: a classe .btn-novo esconde por padrão, então
+      // limpar o inline ('' ) NÃO basta — a regra da classe voltaria a valer.
+      b.style.display = 'inline-block';
       b.addEventListener('click', abrirWizard);
     }
   } catch (e) { console.warn('papel:', e); }
