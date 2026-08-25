@@ -36,6 +36,37 @@ function empStamp(payload) {
 }
 
 // ---------------------------------------------------------------------
+// Código da unidade  ->  lojas.id  (dentro do empreendimento em contexto)
+// ---------------------------------------------------------------------
+// NUNCA derive o id do código com parseInt. Isso só funcionava no Union 511,
+// onde as lojas foram inseridas com id manual 1..52 e o código bate com o id.
+// As unidades criadas pelo wizard usam a sequence que começa em 100, então
+// parseInt('02') = 2 aponta para a LOJA 02 DO UNION — outro empreendimento.
+// O código é único apenas por empreendimento; o id é a única chave real.
+async function mapearLojas(codigos) {
+  const lista = (codigos || []).map(c => String(c));
+  if (!lista.length) return { ids: [], porId: new Map() };
+
+  const ctx = getCtxId();
+  if (!ctx) throw new Error('Nenhum empreendimento em contexto — não é seguro vincular unidades.');
+
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('lojas')
+    .select('id, codigo').eq('empreendimento_id', ctx).in('codigo', lista);
+  if (error) throw new Error('Erro ao localizar as unidades: ' + error.message);
+
+  const porCodigo = new Map((data || []).map(l => [String(l.codigo), l.id]));
+  const faltando = lista.filter(c => !porCodigo.has(c));
+  if (faltando.length) {
+    throw new Error('Unidade(s) não encontrada(s) neste empreendimento: ' + faltando.join(', '));
+  }
+  return {
+    ids: lista.map(c => porCodigo.get(c)),
+    porId: new Map(lista.map(c => [porCodigo.get(c), c])),
+  };
+}
+
+// ---------------------------------------------------------------------
 // SEED inicial (espelha o estado atual do dashboard)
 // Carregado uma vez do localStorage; se não existe, popula com dados.
 // ---------------------------------------------------------------------
@@ -310,8 +341,10 @@ export async function saveContrato(input) {
     const { lojas, id: _idIgnorado, ...contratoBase } = input;
 
     // VALIDAÇÃO ANTI-DUPLICAÇÃO: verifica se alguma das lojas selecionadas já tem contrato ativo
+    let mapaLojas = { ids: [], porId: new Map() };
     if (lojas?.length) {
-      const lojasIds = lojas.map(c => parseInt(c, 10));
+      mapaLojas = await mapearLojas(lojas);
+      const lojasIds = mapaLojas.ids;
       let qConflito = supa.from('contrato_lojas')
         .select('loja_id, contrato_id, contratos!inner(status)')
         .in('loja_id', lojasIds)
@@ -320,7 +353,8 @@ export async function saveContrato(input) {
       const { data: conflitos, error: errConf } = await qConflito;
       if (errConf) throw new Error('Erro ao verificar lojas: ' + errConf.message);
       if (conflitos && conflitos.length > 0) {
-        const lojasOcupadas = [...new Set(conflitos.map(c => String(c.loja_id).padStart(2, '0')))].sort();
+        // usa o código real da unidade; o id não é o código (ver mapearLojas)
+        const lojasOcupadas = [...new Set(conflitos.map(c => mapaLojas.porId.get(c.loja_id) || String(c.loja_id)))].sort();
         throw new Error('Loja(s) já ocupada(s) por contrato ativo: ' + lojasOcupadas.join(', ') + '. Encerre o contrato anterior antes de criar um novo.');
       }
     }
@@ -345,7 +379,7 @@ export async function saveContrato(input) {
     }
     if (!contrato || !contrato.id) throw new Error('Contrato salvo mas resposta vazia');
     if (lojasFoiPassado && lojas?.length) {
-      const lojasMapeadas = lojas.map(codigo => ({ contrato_id: contrato.id, loja_id: parseInt(codigo, 10) }));
+      const lojasMapeadas = mapaLojas.ids.map(lojaId => ({ contrato_id: contrato.id, loja_id: lojaId }));
       const { error: errLojas } = await supa.from('contrato_lojas').insert(lojasMapeadas);
       if (errLojas) throw new Error('Erro ao vincular lojas ao contrato: ' + errLojas.message);
     }
@@ -426,7 +460,10 @@ export async function saveProposta(input) {
     }
     if (!prop || !prop.id) throw new Error('Proposta salva mas resposta vazia');
     if (lojas?.length) {
-      await supa.from('proposta_lojas').insert(lojas.map(codigo => ({ proposta_id: prop.id, loja_id: parseInt(codigo, 10) })));
+      const { ids: lojasIds } = await mapearLojas(lojas);
+      const { error: errPL } = await supa.from('proposta_lojas')
+        .insert(lojasIds.map(lojaId => ({ proposta_id: prop.id, loja_id: lojaId })));
+      if (errPL) throw new Error('Erro ao vincular unidades à proposta: ' + errPL.message);
     }
     return prop;
   }
@@ -563,7 +600,8 @@ export async function saveLead(input) {
   if (!lead || !lead.id) throw new Error('Lead salvo mas resposta vazia');
 
   if (lojas?.length) {
-    const lojasMapeadas = lojas.map(codigo => ({ lead_id: lead.id, loja_id: parseInt(codigo, 10) }));
+    const { ids: lojasIds } = await mapearLojas(lojas);
+    const lojasMapeadas = lojasIds.map(lojaId => ({ lead_id: lead.id, loja_id: lojaId }));
     const { error: errLojas } = await supa.from('lead_lojas').insert(lojasMapeadas);
     if (errLojas) throw new Error('Erro ao vincular lojas ao lead: ' + errLojas.message);
   }
