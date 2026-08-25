@@ -145,15 +145,15 @@ function renderKpis(k, receitaConsol, lojas = []) {
       <div class="kpi-value">${k.inquilinos_ativos}</div>
       <div class="kpi-sub">Mix diversificado</div>
     </div>
-    <div class="kpi" style="background:#FAEEDA">
-      <div class="kpi-label" style="color:#854F0B">Aluguel contratual</div>
-      <div class="kpi-value" style="color:#633806">${formatMoneyShort(receitaContratual)}</div>
-      <div class="kpi-sub" style="color:#854F0B">base · ${diffTxt}</div>
+    <div class="kpi" style="background:var(--rule-soft)">
+      <div class="kpi-label" style="color:#96650B">Aluguel contratual</div>
+      <div class="kpi-value" style="color:#7A5307;font-weight:400">${formatMoneyShort(receitaContratual)}</div>
+      <div class="kpi-sub" style="color:#96650B">base · ${diffTxt}</div>
     </div>
-    <div class="kpi" style="background:#E6F1FB">
-      <div class="kpi-label" style="color:#185FA5">Cobrança real (mês)</div>
-      <div class="kpi-value" style="color:#0C447C">${formatMoneyShort(receitaReal)}</div>
-      <div class="kpi-sub" style="color:#185FA5">${ctrsEstimado === 0 ? `🟢 SIENGE · ${ctrsSienge} contratos` : `🟢 ${ctrsSienge} SIENGE + 🟡 ${ctrsEstimado} estimados`}</div>
+    <div class="kpi" style="background:var(--ciano-soft,#e9f5fb)">
+      <div class="kpi-label" style="color:#0A5872">Cobrança real (mês)</div>
+      <div class="kpi-value" style="color:#023C54;font-weight:400">${formatMoneyShort(receitaReal)}</div>
+      <div class="kpi-sub" style="color:#0A5872">${ctrsEstimado === 0 ? `🟢 SIENGE · ${ctrsSienge} contratos` : `🟢 ${ctrsSienge} SIENGE + 🟡 ${ctrsEstimado} estimados`}</div>
     </div>`;
 }
 

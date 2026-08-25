@@ -7,21 +7,23 @@
 <title>Apex Locações — Portfólio</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#33322f">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#023C54">
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#f7f6f3; --card:#fff; --ink:#2c2c2a; --ink-soft:#5f5e5a; --ink-mute:#8b8a85;
-  --line:#e6e3db; --line-strong:#d8d4c9; --apex:#33322f;
-  --good:#15803d; --good-soft:#dcfce7; --warn:#a16207; --warn-soft:#fef3c7;
-  --crit:#b91c1c; --crit-soft:#fee2e2; --accent:#eb6834;
+  /* Mesmos tokens do app (css/app.css) — identidade Apex Engenharia */
+  --bg:#f4f7f8; --card:#fff; --ink:#10222b; --ink-soft:#43535c; --ink-mute:#78888f;
+  --line:#dce5e9; --line-strong:#c9d8de; --apex:#023C54;
+  --good:#146c43; --good-soft:#e3f2e9; --warn:#96650b; --warn-soft:#fbefd9;
+  --crit:#a32219; --crit-soft:#fbe5e3; --accent:#0092CC; --rule:#F7A51A;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px;padding:24px}
+body{font-family:'Mulish','Inter',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px;padding:24px}
 .wrap{max-width:1240px;margin:0 auto}
-header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--apex);border-radius:10px;color:#fff;gap:16px;flex-wrap:wrap;margin-bottom:22px;border-bottom:3px solid #8b8a85}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--apex);border-radius:10px;color:#fff;gap:16px;flex-wrap:wrap;margin-bottom:22px;border-bottom:3px solid var(--rule)}
 .brand{display:flex;align-items:center;gap:14px}
-.brand .mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#f7a520,#eb6834);display:grid;place-items:center;font-weight:700;font-size:16px;color:#fff;font-family:'Outfit'}
+.brand .mark-logo{height:22px;width:auto;display:block;flex:none}
+.brand .brand-sep{width:1px;height:30px;background:rgba(255,255,255,.22);flex:none}
 .brand h1{font-family:'Outfit';font-size:15px;font-weight:300;letter-spacing:.2em;text-transform:uppercase}
 .brand .sub{font-size:11px;color:rgba(255,255,255,.62);letter-spacing:.05em;margin-top:2px}
 .who{font-size:12px;color:rgba(255,255,255,.7);text-align:right;display:flex;align-items:center;gap:12px}
@@ -32,10 +34,12 @@ header{display:flex;justify-content:space-between;align-items:center;padding:14p
 h2{font-family:'Outfit';font-weight:300;font-size:22px}
 .btn-novo{background:var(--apex);color:#fff;border:none;font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;display:none}
 .btn-novo:hover{background:#4a4945}
-.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 15px}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);margin-bottom:20px;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{padding:16px 17px}
+.kpi + .kpi{border-left:1px solid rgba(247,165,26,.55)}
 .kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-mute);font-weight:500}
-.kpi .v{font-size:24px;font-weight:600;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums}
+.kpi .v{font-family:'Outfit',sans-serif;font-size:28px;font-weight:300;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
 .kpi .s{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
 .ecard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:box-shadow .15s,transform .15s;display:flex;flex-direction:column;text-decoration:none;color:inherit}
@@ -95,8 +99,9 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px}
 
 <header>
   <div class="brand">
-    <div class="mark">A</div>
-    <div><h1>Apex Locações</h1><div class="sub">Gestão de portfólio</div></div>
+    <img src="./imgs/logo-apex.svg" alt="Apex" class="mark-logo">
+    <span class="brand-sep"></span>
+    <div><h1>Portfólio</h1><div class="sub">Todos os empreendimentos</div></div>
   </div>
   <div class="who">
     <span><b id="user-nome">—</b>Portfólio</span>

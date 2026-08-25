@@ -13,8 +13,8 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
-<meta name="theme-color" content="#707272">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#023C54">
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./css/app.css">
 <link rel="stylesheet" href="./css/forms.css">
 </head>
@@ -23,7 +23,8 @@
 
 <header id="app-header">
   <div class="header-brand">
-    <img src="./imgs/logo-union511.png" alt="Logo do empreendimento" class="logo" id="emp-logo">
+    <img src="./imgs/logo-apex.svg" alt="Apex" class="logo-apex">
+    <span class="brand-sep"></span>
     <div class="titles">
       <h1 id="emp-nome">Painel de Controle</h1>
       <div class="sub" id="emp-sub">Carregando…</div>
@@ -409,11 +410,9 @@ if (empAtual) {
     [empAtual.endereco, empAtual.cidade && empAtual.uf ? `${empAtual.cidade}/${empAtual.uf}` : empAtual.cidade].filter(Boolean).join(', '),
     `${empAtual.unidades} unidades${temVagas ? ` · ${empAtual.vagas} vagas` : ''}`
   ].filter(Boolean).join(' · ');
-  // Faixa de contexto: a cor do empreendimento marca o header
-  document.getElementById('app-header').style.borderBottomColor = empAtual.cor || '';
-  // Logo: por enquanto só o Union 511 tem imagem; os demais escondem
-  const logo = document.getElementById('emp-logo');
-  if (empAtual.slug !== 'union-511') logo.style.display = 'none';
+  // A marca da casa é a Apex, fixa. A identidade do empreendimento entra
+  // pela cor: faixa sob o cabeçalho e ponto no seletor (--ctx).
+  document.documentElement.style.setProperty('--ctx', empAtual.cor || 'var(--rule)');
   montarSeletor(document.getElementById('ctx-seletor'));
 
   // ===== Etapa C: comportamento por preset (config do empreendimento) =====
