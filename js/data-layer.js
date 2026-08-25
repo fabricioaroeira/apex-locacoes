@@ -1768,3 +1768,36 @@ export async function importarSiengePDF(contratoId, pdfFile) {
     duplicados_descartados: duplicados
   };
 }
+
+// =====================================================================
+// Cadastro do empreendimento (Etapa B — edição pós-criação)
+// =====================================================================
+
+/** Lê o registro completo de um empreendimento (a v_portfolio não traz tudo). */
+export async function getEmpreendimento(id) {
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('empreendimentos')
+    .select('id, nome, slug, endereco, cidade, uf, proprietaria, cor, preset, finalidade, config, ordem')
+    .eq('id', id).single();
+  if (error) throw new Error('Erro ao carregar o empreendimento: ' + error.message);
+  return data;
+}
+
+/**
+ * Atualiza o cadastro do empreendimento.
+ * O SLUG NÃO É ALTERADO de propósito: ele está em links salvos
+ * (index.html?emp=slug) e no localStorage de quem já usou o sistema.
+ * Renomear o empreendimento não deve quebrar um favorito.
+ */
+export async function atualizarEmpreendimento(id, patch) {
+  const campos = ['nome', 'endereco', 'cidade', 'uf', 'proprietaria', 'cor'];
+  const dados = {};
+  for (const c of campos) if (c in patch) dados[c] = patch[c] === '' ? null : patch[c];
+  if (!Object.keys(dados).length) return null;
+
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('empreendimentos')
+    .update(dados).eq('id', id).select().single();
+  if (error) throw new Error('Erro ao salvar: ' + error.message);
+  return data;
+}

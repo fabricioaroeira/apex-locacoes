@@ -24,14 +24,19 @@ header{display:flex;justify-content:space-between;align-items:center;padding:14p
 .brand{display:flex;align-items:center;gap:14px}
 .brand .mark-logo{height:22px;width:auto;display:block;flex:none}
 .brand .brand-sep{width:1px;height:30px;background:rgba(255,255,255,.22);flex:none}
-.brand h1{font-family:'Outfit';font-size:15px;font-weight:300;letter-spacing:.2em;text-transform:uppercase}
+.brand h1{font-family:'Outfit','Mulish',sans-serif;font-size:15px;font-weight:300;letter-spacing:.2em;text-transform:uppercase}
 .brand .sub{font-size:11px;color:rgba(255,255,255,.62);letter-spacing:.05em;margin-top:2px}
 .who{font-size:12px;color:rgba(255,255,255,.7);text-align:right;display:flex;align-items:center;gap:12px}
 .who b{display:block;color:#fff;font-weight:500}
 .who button{background:transparent;border:1px solid rgba(255,255,255,.3);color:rgba(255,255,255,.9);font:inherit;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer}
 .who button:hover{background:rgba(255,255,255,.12)}
+/* Volta ao empreendimento: é a saída principal desta tela, então tem
+   um pouco mais de peso que o "Sair" e carrega o nome do destino. */
+.who #btn-voltar{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.34);
+  max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who #btn-voltar:hover{background:rgba(255,255,255,.24)}
 .topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
-h2{font-family:'Outfit';font-weight:300;font-size:22px}
+h2{font-family:'Outfit','Mulish',sans-serif;font-weight:300;font-size:22px}
 .btn-novo{background:var(--apex);color:#fff;border:none;font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;display:none}
 .btn-novo:hover{background:#4a4945}
 .kpis{display:grid;grid-template-columns:repeat(5,1fr);margin-bottom:20px;
@@ -42,7 +47,18 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px}
 .kpi .v{font-family:'Outfit',sans-serif;font-size:28px;font-weight:300;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
 .kpi .s{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
-.ecard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:box-shadow .15s,transform .15s;display:flex;flex-direction:column;text-decoration:none;color:inherit}
+.ecard{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:box-shadow .15s,transform .15s;display:flex;flex-direction:column;text-decoration:none;color:inherit}
+/* Lápis de edição: só existe para admin (.on) e fica SEMPRE visível.
+   Escondê-lo até o hover economiza um pixel e custa o botão inteiro —
+   em telefone não existe hover, e no desktop ninguém acha o que não aparece. */
+.ecard .ed{position:absolute;top:13px;right:12px;width:29px;height:29px;border-radius:7px;border:1px solid var(--line);
+  background:#fff;color:var(--ink-mute);font:inherit;font-size:14px;line-height:1;cursor:pointer;padding:0;
+  display:none;align-items:center;justify-content:center;transition:border-color .15s,color .15s}
+.ecard .ed.on{display:flex}
+.ecard .ed:hover{border-color:var(--accent);color:var(--accent)}
+.ecard .ed:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* espaço para o lápis não encostar no nome */
+.ecard .ed.on ~ .body .tt{padding-right:26px}
 .ecard:hover{box-shadow:0 6px 20px rgba(0,0,0,.07);transform:translateY(-2px)}
 .ecard .top{height:5px;background:var(--c,#8b8a85)}
 .ecard .body{padding:15px 16px 16px}
@@ -68,19 +84,19 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px}
 .wiz-back{position:fixed;inset:0;background:rgba(30,29,26,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:100;overflow:auto}
 .wiz-back.on{display:flex}
 .wiz{background:#fff;border-radius:14px;max-width:760px;width:100%;padding:22px 24px 24px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-.wiz h3{font-family:'Outfit';font-weight:400;font-size:18px;margin-bottom:4px}
+.wiz h3{font-family:'Outfit','Mulish',sans-serif;font-weight:400;font-size:18px;margin-bottom:4px}
 .wiz .passo{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-mute);margin-bottom:16px}
 .presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 .preset{border:1.5px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;background:#fff}
 .preset:hover{border-color:var(--line-strong)}
-.preset.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(235,104,52,.13)}
+.preset.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,146,204,.15)}
 .preset .ic{font-size:19px}
 .preset h4{font-size:13.5px;margin:7px 0 3px}
 .preset p{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
 .frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:4px}
 .fld label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-mute);font-weight:600;margin-bottom:5px}
 .fld input,.fld select{width:100%;background:#fff;border:1px solid var(--line-strong);border-radius:7px;padding:9px 11px;font:inherit;font-size:13px}
-.fld input:focus,.fld select:focus{outline:2px solid rgba(235,104,52,.35);border-color:var(--accent)}
+.fld input:focus,.fld select:focus{outline:2px solid rgba(0,146,204,.35);border-color:var(--accent)}
 .cores{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px}
 .cor{width:26px;height:26px;border-radius:8px;cursor:pointer;border:2px solid transparent}
 .cor.sel{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
@@ -91,6 +107,18 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px}
 .wbtn.pri{background:var(--apex);color:#fff;border-color:var(--apex)}
 .wbtn.pri:disabled{opacity:.5;cursor:default}
 .wiz-erro{color:var(--crit);font-size:12.5px;margin-top:10px;display:none}
+/* Sugestão de padronização: faixa âmbar (atenção, não comando) */
+.sugestao{display:none;align-items:center;gap:14px;margin-top:14px;padding:12px 14px;
+  background:var(--warn-soft);border-left:3px solid var(--rule);border-radius:8px}
+.sugestao.on{display:flex}
+.sugestao .s-txt{flex:1;min-width:0}
+.sugestao .s-tit{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--warn);font-weight:700;margin-bottom:6px}
+.sugestao .s-prev{font-size:12.5px;color:var(--ink);line-height:1.6;min-width:0}
+.sugestao .s-prev > div + div{margin-top:2px}
+.sugestao .s-prev del{color:var(--ink-mute);text-decoration:line-through;opacity:.75}
+.sugestao .s-prev b{font-weight:600}
+.sugestao .wbtn{flex:none;padding:6px 13px;font-size:12.5px}
+.wiz-foot .obs code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:#eef2f4;padding:1px 5px;border-radius:4px;color:var(--ink-soft)}
 @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -105,6 +133,7 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px}
   </div>
   <div class="who">
     <span><b id="user-nome">—</b>Portfólio</span>
+    <button id="btn-voltar" style="display:none"></button>
     <button id="btn-logout">Sair</button>
   </div>
 </header>
@@ -116,6 +145,41 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px}
 <div class="kpis" id="kpis"></div>
 <div class="grid" id="cards"><div class="loading">Carregando empreendimentos…</div></div>
 
+</div>
+
+<!-- ===== Editar cadastro do empreendimento ===== -->
+<div class="wiz-back" id="ed-back">
+  <div class="wiz" style="max-width:580px">
+    <h3>Editar cadastro</h3>
+    <div class="passo" id="ed-passo">—</div>
+
+    <div class="frm">
+      <div class="fld" style="grid-column:1/-1"><label>Nome do empreendimento</label><input id="e-nome"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Endereço</label><input id="e-endereco" placeholder="Rua / rodovia, número"></div>
+      <div class="fld"><label>Cidade</label><input id="e-cidade" placeholder="Brasília"></div>
+      <div class="fld"><label>UF</label><input id="e-uf" maxlength="2" placeholder="DF"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Proprietária (locadora)</label><input id="e-prop" placeholder="Razão social"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Cor de identificação</label><div class="cores" id="e-cores"></div></div>
+    </div>
+
+    <div class="sugestao" id="ed-sugestao">
+      <div class="s-txt">
+        <div class="s-tit">Padronizar a escrita</div>
+        <div class="s-prev" id="ed-prev"></div>
+      </div>
+      <button class="wbtn" id="ed-aplicar" type="button">Aplicar</button>
+    </div>
+
+    <div class="wiz-erro" id="ed-erro"></div>
+
+    <div class="wiz-foot">
+      <span class="obs">O endereço na web (<code id="ed-slug">—</code>) não muda ao renomear, para não quebrar links já salvos.</span>
+      <span class="acts">
+        <button class="wbtn" id="ed-cancelar">Cancelar</button>
+        <button class="wbtn pri" id="ed-salvar">Salvar</button>
+      </span>
+    </div>
+  </div>
 </div>
 
 <!-- ===== Wizard de novo empreendimento ===== -->
@@ -163,9 +227,10 @@ h2{font-family:'Outfit';font-weight:300;font-size:22px}
 
 <script type="module">
 import { requireAuth, getCurrentUser, signOut } from './js/auth.js';
-import { listEmpreendimentos, setCtxId } from './js/contexto.js';
+import { listEmpreendimentos, setCtxId, getCtxId } from './js/contexto.js';
 import { getSupabase } from './js/supabase-client.js';
-import { getMeuPapel } from './js/data-layer.js';
+import { getMeuPapel, getEmpreendimento, atualizarEmpreendimento } from './js/data-layer.js';
+import { padronizarNome, precisaPadronizar, padronizarUF } from './js/texto.js';
 
 const fmtBRL = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const PRESET_LABEL = {
@@ -213,6 +278,7 @@ const CORES = ['#eb6834','#2a78d6','#1baf7a','#eda100','#e87ba4','#008300','#4a3
 // Boot
 // ---------------------------------------------------------------------
 let _user = null;
+let _admin = false;
 
 async function boot() {
   await requireAuth();
@@ -232,12 +298,26 @@ async function boot() {
     return;
   }
 
+  // Volta para o empreendimento em que a pessoa estava. Só aparece quando
+  // existe contexto — sem isso não há "de volta para onde".
+  // Usa replace() de propósito: com href, ir e voltar empilharia
+  // portfólio/app/portfólio e o botão Voltar do navegador viraria um vaivém.
+  const ctx = getCtxId() ? emps.find(e => e.empreendimento_id === getCtxId()) : null;
+  if (ctx) {
+    const v = document.getElementById('btn-voltar');
+    v.textContent = '← ' + ctx.nome;
+    v.title = 'Voltar para ' + ctx.nome;
+    v.style.display = 'inline-block';
+    v.addEventListener('click', () => location.replace('./index.html'));
+  }
+
   // Botão de novo empreendimento: só admin.
   // Usa a MESMA checagem do botão Admin do app (RPC user_role) — o caminho
   // via perfil espalhado no getCurrentUser se mostrou menos confiável.
   try {
     const papel = _user?.role === 'admin' ? 'admin' : await getMeuPapel();
-    if (papel === 'admin') {
+    _admin = papel === 'admin';
+    if (_admin) {
       const b = document.getElementById('btn-novo-emp');
       // display explícito: a classe .btn-novo esconde por padrão, então
       // limpar o inline ('' ) NÃO basta — a regra da classe voltaria a valer.
@@ -267,6 +347,7 @@ function renderPortfolio(emps) {
     const temVagas = (e.vagas || 0) > 0;
     return `
     <a class="ecard" style="--c:${e.cor}" href="./index.html?emp=${encodeURIComponent(e.slug)}">
+      <button class="ed${_admin ? ' on' : ''}" data-ed="${e.empreendimento_id}" title="Editar cadastro de ${e.nome}" aria-label="Editar cadastro de ${e.nome}">✎</button>
       <div class="top"></div>
       <div class="body">
         <div class="tt"><span class="chip"></span><div>
@@ -290,11 +371,115 @@ function renderPortfolio(emps) {
   }).join('');
 }
 
+const $ = id => document.getElementById(id);
+
+// ---------------------------------------------------------------------
+// Editar cadastro
+// ---------------------------------------------------------------------
+// O lápis mora dentro do <a> do card, então o clique precisa ser
+// interceptado antes de virar navegação.
+document.getElementById('cards').addEventListener('click', ev => {
+  const btn = ev.target.closest('[data-ed]');
+  if (!btn) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  abrirEdicao(btn.getAttribute('data-ed'));
+});
+
+const ed = { id: null, cor: null };
+const CAMPOS_TXT = [['e-nome', 'Nome'], ['e-endereco', 'Endereço'], ['e-cidade', 'Cidade']];
+
+function pintarCores(container, selecionada, onPick) {
+  container.innerHTML = CORES.map(c =>
+    `<span class="cor${c === selecionada ? ' sel' : ''}" data-c="${c}" style="background:${c}"></span>`).join('');
+  container.querySelectorAll('.cor').forEach(s => s.addEventListener('click', () => {
+    container.querySelectorAll('.cor').forEach(x => x.classList.remove('sel'));
+    s.classList.add('sel');
+    onPick(s.dataset.c);
+  }));
+}
+
+/** Mostra o que a padronização mudaria, campo a campo, antes de mexer em nada. */
+function revisarPadronizacao() {
+  const linhas = [];
+  for (const [id, rot] of CAMPOS_TXT) {
+    const atual = $(id).value;
+    if (precisaPadronizar(atual)) {
+      linhas.push(`<div><span style="color:var(--ink-mute)">${rot}:</span> <del>${atual.trim()}</del> → <b>${padronizarNome(atual)}</b></div>`);
+    }
+  }
+  $('ed-prev').innerHTML = linhas.join('');
+  $('ed-sugestao').classList.toggle('on', linhas.length > 0);
+}
+
+async function abrirEdicao(id) {
+  $('ed-erro').style.display = 'none';
+  $('ed-passo').textContent = 'Carregando…';
+  $('ed-back').classList.add('on');
+  try {
+    const e = await getEmpreendimento(id);
+    ed.id = e.id;
+    ed.cor = e.cor;
+    $('ed-passo').textContent = (PRESET_LABEL[e.preset] || e.preset || 'Empreendimento');
+    $('ed-slug').textContent = '?emp=' + e.slug;
+    $('e-nome').value     = e.nome || '';
+    $('e-endereco').value = e.endereco || '';
+    $('e-cidade').value   = e.cidade || '';
+    $('e-uf').value       = e.uf || '';
+    $('e-prop').value     = e.proprietaria || '';
+    pintarCores($('e-cores'), e.cor, c => { ed.cor = c; });
+    revisarPadronizacao();
+    $('e-nome').focus();
+  } catch (err) {
+    $('ed-passo').textContent = '—';
+    $('ed-erro').textContent = err.message;
+    $('ed-erro').style.display = '';
+  }
+}
+
+CAMPOS_TXT.forEach(([id]) => $(id).addEventListener('input', revisarPadronizacao));
+$('e-uf').addEventListener('blur', () => { $('e-uf').value = padronizarUF($('e-uf').value); });
+
+$('ed-aplicar').addEventListener('click', () => {
+  CAMPOS_TXT.forEach(([id]) => { $(id).value = padronizarNome($(id).value); });
+  revisarPadronizacao();
+});
+
+$('ed-cancelar').addEventListener('click', () => $('ed-back').classList.remove('on'));
+$('ed-back').addEventListener('click', ev => { if (ev.target === $('ed-back')) $('ed-back').classList.remove('on'); });
+
+$('ed-salvar').addEventListener('click', async () => {
+  const btn = $('ed-salvar');
+  const nome = $('e-nome').value.trim();
+  if (!nome) {
+    $('ed-erro').textContent = 'O empreendimento precisa de um nome.';
+    $('ed-erro').style.display = ''; return;
+  }
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  $('ed-erro').style.display = 'none';
+  try {
+    await atualizarEmpreendimento(ed.id, {
+      nome,
+      endereco: $('e-endereco').value.trim(),
+      cidade:   $('e-cidade').value.trim(),
+      uf:       padronizarUF($('e-uf').value),
+      proprietaria: $('e-prop').value.trim(),
+      cor: ed.cor,
+    });
+    $('ed-back').classList.remove('on');
+    renderPortfolio(await listEmpreendimentos(true));   // force: refaz o cache do seletor
+  } catch (err) {
+    $('ed-erro').textContent = err.message;
+    $('ed-erro').style.display = '';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Salvar';
+  }
+});
+
 // ---------------------------------------------------------------------
 // Wizard
 // ---------------------------------------------------------------------
 const wiz = { passo: 1, preset: null, cor: null };
-const $ = id => document.getElementById(id);
 
 function abrirWizard() {
   wiz.passo = 1; wiz.preset = null; wiz.cor = null;
@@ -343,7 +528,9 @@ function slugify(s) {
 }
 
 async function criarEmpreendimento() {
-  const nome = $('w-nome').value.trim();
+  // Padroniza já na entrada: assim ninguém precisa lembrar da regra de caixa,
+  // e o cadastro nasce do jeito que vai sair no contrato e no PDF.
+  const nome = padronizarNome($('w-nome').value.trim());
   if (!nome) throw new Error('Dê um nome ao empreendimento (passo 2).');
   const qtd = wiz.preset.qtdFixa || Math.max(1, Math.min(500, parseInt($('w-qtd').value, 10) || 1));
   const cod1 = ($('w-cod1').value.trim() || '01');
@@ -358,9 +545,9 @@ async function criarEmpreendimento() {
   const { data: emp, error: e1 } = await supa.from('empreendimentos').insert({
     nome, slug, preset: wiz.preset.key, finalidade: wiz.preset.finalidade,
     cor: wiz.cor || wiz.preset.cor,
-    endereco: $('w-endereco').value.trim() || null,
-    cidade: $('w-cidade').value.trim() || null,
-    uf: $('w-uf').value.trim().toUpperCase() || null,
+    endereco: padronizarNome($('w-endereco').value.trim()) || null,
+    cidade: padronizarNome($('w-cidade').value.trim()) || null,
+    uf: padronizarUF($('w-uf').value) || null,
     proprietaria: $('w-prop').value.trim() || null,
     ordem: emps.length + 1,
     config: wiz.preset.config
