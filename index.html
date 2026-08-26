@@ -9,6 +9,12 @@
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#023C54">
 <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<!-- A administração mora aqui agora, e forms-admin/modal usam as classes
+     do app. Estes links vêm ANTES do bloco de estilo desta página, de
+     propósito: em empate de especificidade vence quem aparece por último,
+     então as regras locais continuam mandando no visual do portfólio. -->
+<link rel="stylesheet" href="./css/app.css">
+<link rel="stylesheet" href="./css/forms.css">
 <style>
 :root{
   /* Mesmos tokens do app (css/app.css) — identidade Apex Engenharia */
@@ -157,6 +163,7 @@ h2{font-family:'Outfit','Mulish',sans-serif;font-weight:300;font-size:22px}
   </div>
   <div class="who">
     <span><b id="user-nome">—</b>Portfólio</span>
+    <button id="btn-admin" title="Administração de usuários e acessos" style="display:none">⚙️ Admin</button>
     <button id="btn-logout">Sair</button>
   </div>
 </header>
@@ -178,6 +185,8 @@ h2{font-family:'Outfit','Mulish',sans-serif;font-weight:300;font-size:22px}
 <div class="grid" id="cards"><div class="loading">Carregando empreendimentos…</div></div>
 
 </div>
+
+<div id="toast-container"></div>
 
 <!-- ===== Editar cadastro do empreendimento ===== -->
 <div class="wiz-back" id="ed-back">
@@ -263,6 +272,7 @@ import { listEmpreendimentos } from './js/contexto.js';
 import { getSupabase } from './js/supabase-client.js';
 import { getMeuPapel, getEmpreendimento, atualizarEmpreendimento, getAlertasPortfolio } from './js/data-layer.js';
 import { padronizarNome, precisaPadronizar, padronizarUF } from './js/texto.js';
+import { abrirAdminUsuarios } from './js/forms-admin.js';
 
 const fmtBRL = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const PRESET_LABEL = {
@@ -352,6 +362,13 @@ async function boot() {
       // limpar o inline ('' ) NÃO basta — a regra da classe voltaria a valer.
       b.style.display = 'inline-block';
       b.addEventListener('click', abrirWizard);
+
+      // Administração: usuários, papéis e acessos por empreendimento.
+      // Mora no portfólio porque é assunto de portfólio — antes obrigava
+      // entrar num imóvel para gerenciar quem enxerga o quê.
+      const adm = document.getElementById('btn-admin');
+      adm.style.display = '';        // escondido por atributo inline: '' basta
+      adm.addEventListener('click', () => abrirAdminUsuarios());
     }
   } catch (e) { console.warn('papel:', e); }
 
