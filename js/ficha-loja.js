@@ -911,7 +911,14 @@ function montarFormAnexoNovo(contratoId, onFim) {
     iaStatus.style.background = '#eff6ff';
     iaStatus.style.color = '#1e40af';
     iaStatus.style.border = '1px solid #bfdbfe';
-    iaStatus.innerHTML = '🤖 Claude está lendo o PDF e detectando tipo/validade...';
+    // Igual ao formulário de contrato: o corpo vai em base64 (~1,37x o arquivo)
+    // e a Edge Function tem teto. Acima dele a chamada nem chega ao servidor.
+    // O ANEXO em si não depende disso — o bucket aceita 50 MB.
+    const MB = f.size / 1048576;
+    iaStatus.innerHTML = MB > 4
+      ? '🤖 Lendo o PDF… <span style="opacity:.8">(' + MB.toFixed(1).replace('.', ',') +
+        ' MB — arquivos grandes podem não passar na leitura automática)</span>'
+      : '🤖 Claude está lendo o PDF e detectando tipo/validade...';
     try {
       const ext = await extrairDocumentoDoPDF(f);
       renderCamposForm({
@@ -930,7 +937,13 @@ function montarFormAnexoNovo(contratoId, onFim) {
       iaStatus.style.background = '#fef2f2';
       iaStatus.style.color = '#991b1b';
       iaStatus.style.border = '1px solid #fecaca';
-      iaStatus.innerHTML = '⚠️ IA falhou: ' + err.message + '. Preencha manualmente.';
+      const rede = /failed to fetch|networkerror|load failed/i.test(err.message || '');
+      iaStatus.innerHTML = rede
+        ? '⚠️ <strong>A leitura automática não passou</strong>' +
+          (MB > 4 ? ' — o PDF tem ' + MB.toFixed(1).replace('.', ',') + ' MB e excede o limite de envio.' : ' (falha de rede).') +
+          '<br>Isso <strong>não impede o anexo</strong>: escolha o tipo e clique em Salvar que o PDF sobe normalmente.'
+        : '⚠️ Não consegui ler o PDF: ' + err.message +
+          '<br>Preencha os campos à mão — o anexo em si funciona normalmente.';
     }
   });
 

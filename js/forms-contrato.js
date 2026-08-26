@@ -246,7 +246,19 @@ export async function abrirFormContrato(id = null, opts = {}) {
         iaStatus.style.background = '#eff6ff';
         iaStatus.style.color = '#1e40af';
         iaStatus.style.border = '1px solid #bfdbfe';
-        iaStatus.innerHTML = '🤖 Claude está lendo o Quadro Resumo do contrato...';
+        // PDFs assinados (D4Sign e afins) costumam vir em dezenas de MB porque
+        // são digitalizações. O corpo da requisição vai em base64, ~1,37x o
+        // tamanho do arquivo, e a Edge Function tem teto de tamanho: acima dele
+        // a chamada é barrada ANTES de chegar na função e o navegador só diz
+        // "Failed to fetch". Não bloqueamos a tentativa — só avisamos, porque o
+        // teto exato depende do plano e não vale impedir um caso que funciona.
+        const MB = f.size / 1048576;
+        if (MB > 4) {
+          iaStatus.innerHTML = '🤖 Lendo o Quadro Resumo… <span style="opacity:.8">(PDF de ' +
+            MB.toFixed(1).replace('.', ',') + ' MB — arquivos grandes podem não passar na leitura automática)</span>';
+        } else {
+          iaStatus.innerHTML = '🤖 Claude está lendo o Quadro Resumo do contrato...';
+        }
         try {
           const extraido = await extrairContratoDoPDF(f);
           const novoInquilinoData = preencherCamposComExtracao(body, extraido, picker, inquilinos);
@@ -265,7 +277,22 @@ export async function abrirFormContrato(id = null, opts = {}) {
           iaStatus.style.background = '#fef2f2';
           iaStatus.style.color = '#991b1b';
           iaStatus.style.border = '1px solid #fecaca';
-          iaStatus.innerHTML = '⚠️ Auto-preenchimento falhou: ' + err.message;
+          // "Failed to fetch" é falha de rede: a requisição não chegou ao
+          // servidor. Com PDF grande, a causa quase certa é o tamanho.
+          const rede = /failed to fetch|networkerror|load failed/i.test(err.message || '');
+          if (rede && MB > 4) {
+            iaStatus.innerHTML =
+              '⚠️ <strong>A leitura automática não passou</strong> — o PDF tem ' +
+              MB.toFixed(1).replace('.', ',') + ' MB e excede o limite de envio.' +
+              '<br>Preencha os campos à mão: <strong>o PDF continua sendo anexado normalmente</strong> ao criar o contrato.';
+          } else if (rede) {
+            iaStatus.innerHTML =
+              '⚠️ <strong>Não consegui falar com o servidor</strong> (falha de rede).' +
+              '<br>Confira a conexão e anexe de novo, ou preencha à mão — o PDF é anexado do mesmo jeito.';
+          } else {
+            iaStatus.innerHTML = '⚠️ Auto-preenchimento falhou: ' + err.message +
+              '<br><span style="opacity:.85">Você pode preencher à mão; o PDF continua sendo anexado.</span>';
+          }
         }
       });
     }, 100);

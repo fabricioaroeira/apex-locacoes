@@ -7,6 +7,3 @@ sql/
 vercel.json
 PUSH_GITHUB.bat
 PUSH_UPDATE.bat
-
-# scratch de sessão (arquivos que o Claude não pode apagar diretamente)
-_to_delete/

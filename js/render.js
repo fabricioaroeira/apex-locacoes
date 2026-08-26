@@ -86,7 +86,7 @@ function renderCounters(kpis, propostas, leads = []) {
 // ---------------------------------------------------------------------
 function renderKpis(k, receitaConsol, lojas = []) {
   // % de área locada (ABL/GLA): m² das lojas ocupadas ÷ m² de TODAS as lojas
-  // (inclui as 4 de uso interno da JAX — podem ser liberadas pra locação no futuro)
+  // (inclui as de uso interno — podem ser liberadas pra locação no futuro)
   const areaLocada = lojas.filter(l => l.status === 'ocupada')
     .reduce((s, l) => s + (Number(l.area_privativa) || 0), 0);
   const areaTotalEmp = lojas
@@ -1320,7 +1320,12 @@ function renderAcompanhamentoLocacao(lojas, contratos, propostas, inquilinos) {
       let cor, bg, valorMes, valorM2, nome;
       if (l.uso_interno || l.status === 'uso_interno') {
         cor = '#5F5E5A'; bg = '#F1EFE8';
-        valorMes = '—'; valorM2 = '—'; nome = 'JAX 28 (interno)';
+        valorMes = '—'; valorM2 = '—';
+        // Quem ocupa a unidade interna vem de atributos.ocupante_interno.
+        // Antes era 'JAX 28' escrito aqui, e aparecia em TODO empreendimento —
+        // no QS 406, onde quem ocupa é a Apex, o app mostrava JAX 28.
+        const ocupante = l.atributos && l.atributos.ocupante_interno;
+        nome = ocupante ? ocupante + ' (interno)' : 'Uso interno';
       } else if (c) {
         cor = '#A32D2D'; bg = '';
         const v = Number(c.valor_aluguel || 0);

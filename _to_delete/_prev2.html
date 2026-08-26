@@ -1,0 +1,170 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet"><style>
+:root{
+  /* Mesmos tokens do app (css/app.css) — identidade Apex Engenharia */
+  --bg:#f4f7f8; --card:#fff; --ink:#10222b; --ink-soft:#43535c; --ink-mute:#78888f;
+  --line:#dce5e9; --line-strong:#c9d8de; --apex:#023C54;
+  --good:#146c43; --good-soft:#e3f2e9; --warn:#96650b; --warn-soft:#fbefd9;
+  --crit:#a32219; --crit-soft:#fbe5e3; --accent:#0092CC; --rule:#F7A51A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Mulish','Inter',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px;padding:24px}
+.wrap{max-width:1240px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--apex);border-radius:10px;color:#fff;gap:16px;flex-wrap:wrap;margin-bottom:22px;border-bottom:3px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:14px}
+.brand .mark-logo{height:22px;width:auto;display:block;flex:none}
+.brand .brand-sep{width:1px;height:30px;background:rgba(255,255,255,.22);flex:none}
+.brand h1{font-family:'Outfit','Mulish',sans-serif;font-size:15px;font-weight:300;letter-spacing:.2em;text-transform:uppercase}
+.brand .sub{font-size:11px;color:rgba(255,255,255,.62);letter-spacing:.05em;margin-top:2px}
+.who{font-size:12px;color:rgba(255,255,255,.7);text-align:right;display:flex;align-items:center;gap:12px}
+.who b{display:block;color:#fff;font-weight:500}
+.who button{background:transparent;border:1px solid rgba(255,255,255,.3);color:rgba(255,255,255,.9);font:inherit;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer}
+.who button:hover{background:rgba(255,255,255,.12)}
+.topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+h2{font-family:'Outfit','Mulish',sans-serif;font-weight:300;font-size:22px}
+.btn-novo{background:var(--apex);color:#fff;border:none;font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;display:none;align-items:center;gap:7px}
+.btn-novo:hover{background:#4a4945}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);margin-bottom:20px;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{padding:16px 17px}
+.kpi + .kpi{border-left:1px solid rgba(247,165,26,.55)}
+.kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-mute);font-weight:500}
+.kpi .v{font-family:'Outfit',sans-serif;font-size:28px;font-weight:300;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .s{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.ecard{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:box-shadow .15s,transform .15s;display:flex;flex-direction:column;text-decoration:none;color:inherit}
+/* Lápis de edição: só existe para admin (.on) e fica SEMPRE visível.
+   Escondê-lo até o hover economiza um pixel e custa o botão inteiro —
+   em telefone não existe hover, e no desktop ninguém acha o que não aparece. */
+.ecard .ed{position:absolute;top:13px;right:12px;width:29px;height:29px;border-radius:7px;border:1px solid var(--line);
+  background:#fff;color:var(--ink-mute);font:inherit;font-size:14px;line-height:1;cursor:pointer;padding:0;
+  display:none;align-items:center;justify-content:center;transition:border-color .15s,color .15s}
+.ecard .ed.on{display:flex}
+.ecard .ed:hover{border-color:var(--accent);color:var(--accent)}
+.ecard .ed:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* espaço para o lápis não encostar no nome */
+.ecard .ed.on ~ .body .tt{padding-right:26px}
+.ecard:hover{box-shadow:0 6px 20px rgba(0,0,0,.07);transform:translateY(-2px)}
+.ecard .top{height:5px;background:var(--c,#8b8a85)}
+.ecard .body{padding:15px 16px 16px}
+.ecard .tt{display:flex;align-items:flex-start;gap:9px}
+.ecard .chip{width:10px;height:10px;border-radius:3px;background:var(--c,#8b8a85);margin-top:5px;flex:none}
+.ecard h3{font-size:15px;font-weight:600}
+.ecard .tipo{font-size:11px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.07em;margin-top:2px}
+.ecard .end{font-size:12px;color:var(--ink-soft);margin-top:8px;min-height:18px}
+.ecard dl{display:grid;grid-template-columns:1fr 1fr;gap:10px 8px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.ecard dt{font-size:10.5px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.06em}
+.ecard dd{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:1px}
+.meter{height:6px;background:#eeece6;border-radius:999px;overflow:hidden;margin-top:12px}
+.meter i{display:block;height:100%;background:var(--c,#8b8a85);border-radius:999px}
+.mlab{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-top:5px}
+.badges{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.b{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:500}
+.b.warn{background:var(--warn-soft);color:var(--warn)}
+.b.good{background:var(--good-soft);color:var(--good)}
+.b.mute{background:#efede7;color:var(--ink-soft)}
+.loading{color:var(--ink-mute);padding:40px;text-align:center}
+
+/* ===== Precisa de você — pendências do portfólio inteiro ===== */
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:11px}
+.sec-head .meta{font-size:12px;color:var(--ink-mute)}
+.sec-head .meta button{background:none;border:none;font:inherit;font-size:12px;font-weight:600;
+  color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+.pend{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-bottom:26px}
+.pend a{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+  display:flex;flex-direction:column;gap:9px;text-decoration:none;color:inherit;
+  transition:box-shadow .15s,transform .15s}
+.pend a:hover{box-shadow:0 6px 20px rgba(0,0,0,.07);transform:translateY(-2px)}
+.pend a.critico{border-left:3px solid var(--crit)}
+.pend a.alto{border-left:3px solid var(--warn)}
+.pend .u{display:flex;align-items:center;gap:7px;font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.07em;font-weight:700}
+.pend a.critico .u{color:var(--crit)}
+.pend a.alto .u{color:var(--warn)}
+.pend .t{font-size:14px;font-weight:600;line-height:1.35}
+.pend .d{font-size:12px;color:var(--ink-soft);line-height:1.45}
+/* margin-top:auto encosta o rodapé na base: sem isso, um título de duas
+   linhas desalinha o filete divisor entre os cards vizinhos. */
+.pend .foot{display:flex;align-items:center;gap:7px;margin-top:auto;padding-top:10px;
+  border-top:1px solid var(--line-soft,#e9eff1);font-size:11.5px;color:var(--ink-soft)}
+.pend .foot .c{width:9px;height:9px;border-radius:3px;flex:none}
+.pend .foot svg{margin-left:auto;flex:none}
+.pend-vazio{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:14px 16px;display:flex;align-items:center;gap:10px;font-size:13px;
+  color:var(--ink-soft);margin-bottom:26px}
+
+
+/* ===== Wizard ===== */
+.wiz-back{position:fixed;inset:0;background:rgba(30,29,26,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:100;overflow:auto}
+.wiz-back.on{display:flex}
+.wiz{background:#fff;border-radius:14px;max-width:760px;width:100%;padding:22px 24px 24px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.wiz h3{font-family:'Outfit','Mulish',sans-serif;font-weight:400;font-size:18px;margin-bottom:4px}
+.wiz .passo{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-mute);margin-bottom:16px}
+.presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.preset{border:1.5px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;background:#fff}
+.preset:hover{border-color:var(--line-strong)}
+.preset.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,146,204,.15)}
+.preset .ic{font-size:19px}
+.preset h4{font-size:13.5px;margin:7px 0 3px}
+.preset p{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:4px}
+.fld label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-mute);font-weight:600;margin-bottom:5px}
+.fld input,.fld select{width:100%;background:#fff;border:1px solid var(--line-strong);border-radius:7px;padding:9px 11px;font:inherit;font-size:13px}
+.fld input:focus,.fld select:focus{outline:2px solid rgba(0,146,204,.35);border-color:var(--accent)}
+.cores{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px}
+.cor{width:26px;height:26px;border-radius:8px;cursor:pointer;border:2px solid transparent}
+.cor.sel{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.wiz-foot{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.wiz-foot .obs{font-size:11.5px;color:var(--ink-mute);max-width:55%}
+.wiz-foot .acts{display:flex;gap:8px}
+.wbtn{font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;border:1px solid var(--line-strong);background:#fff}
+.wbtn.pri{background:var(--apex);color:#fff;border-color:var(--apex)}
+.wbtn.pri:disabled{opacity:.5;cursor:default}
+.wiz-erro{color:var(--crit);font-size:12.5px;margin-top:10px;display:none}
+/* Sugestão de padronização: faixa âmbar (atenção, não comando) */
+.sugestao{display:none;align-items:center;gap:14px;margin-top:14px;padding:12px 14px;
+  background:var(--warn-soft);border-left:3px solid var(--rule);border-radius:8px}
+.sugestao.on{display:flex}
+.sugestao .s-txt{flex:1;min-width:0}
+.sugestao .s-tit{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--warn);font-weight:700;margin-bottom:6px}
+.sugestao .s-prev{font-size:12.5px;color:var(--ink);line-height:1.6;min-width:0}
+.sugestao .s-prev > div + div{margin-top:2px}
+.sugestao .s-prev del{color:var(--ink-mute);text-decoration:line-through;opacity:.75}
+.sugestao .s-prev b{font-weight:600}
+.sugestao .wbtn{flex:none;padding:6px 13px;font-size:12.5px}
+.wiz-foot .obs code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:#eef2f4;padding:1px 5px;border-radius:4px;color:var(--ink-soft)}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+</style></head><body><div class="wrap"><header>
+  <div class="brand">
+    <img src="./imgs/logo-apex.svg" alt="Apex" class="mark-logo">
+    <span class="brand-sep"></span>
+    <div><h1>Portfólio</h1><div class="sub">Todos os empreendimentos</div></div>
+  </div>
+  <div class="who">
+    <span><b id="user-nome">Fabrício Aroeira</b>Portfólio</span>
+    <button id="btn-logout">Sair</button>
+  </div>
+</header><div class="sec-head" id="pend-head" style="display:flex">
+  <h2>Precisa de você</h2>
+  <span class="meta">1 crítica de 6 · <button type="button">ver todas</button></span>
+</div>
+<div id="pend-wrap"><div class="pend"><a class="critico" href="#">
+      <span class="u"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/></svg>Crítico</span>
+      <span class="t">Reajuste anual — Constance</span><span class="d">contrato entra em reajuste</span>
+      <span class="foot"><span class="c" style="background:#eb6834"></span>Union 511
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-mute)" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></a><a class="alto" href="#">
+      <span class="u"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>9 dias em atraso</span>
+      <span class="t">Proposta aceita aguardando docs — Alberto Cascais</span><span class="d">aceita há mais de 7 dias</span>
+      <span class="foot"><span class="c" style="background:#eb6834"></span>Union 511
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-mute)" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></a><a class="alto" href="#">
+      <span class="u"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>34 dias em atraso</span>
+      <span class="t">Lead parado — Carlos Bezerra</span><span class="d">sem interação há mais de 30 dias</span>
+      <span class="foot"><span class="c" style="background:#eb6834"></span>Union 511
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-mute)" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></a></div></div>
+
+<div class="topo">
+  <h2>Empreendimentos</h2>
+  <button class="btn-novo" style="display:inline-flex" id="btn-novo-emp">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    Novo empreendimento
+  </button>
+</div></div></body></html>
