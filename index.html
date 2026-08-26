@@ -3,580 +3,708 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Apex Locações">
-<!-- CSP básico: restringe scripts/estilos a self + CDNs conhecidos + endpoints Supabase/Anthropic -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.anthropic.com; frame-src 'self' blob:;">
-<title>Apex Locações</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://*.supabase.in; frame-src 'self' blob:;">
+<title>Apex Locações — Portfólio</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <meta name="theme-color" content="#023C54">
 <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./css/app.css">
-<link rel="stylesheet" href="./css/forms.css">
+<style>
+:root{
+  /* Mesmos tokens do app (css/app.css) — identidade Apex Engenharia */
+  --bg:#f4f7f8; --card:#fff; --ink:#10222b; --ink-soft:#43535c; --ink-mute:#78888f;
+  --line:#dce5e9; --line-strong:#c9d8de; --apex:#023C54;
+  --good:#146c43; --good-soft:#e3f2e9; --warn:#96650b; --warn-soft:#fbefd9;
+  --crit:#a32219; --crit-soft:#fbe5e3; --accent:#0092CC; --rule:#F7A51A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Mulish','Inter',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px;padding:24px}
+.wrap{max-width:1240px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--apex);border-radius:10px;color:#fff;gap:16px;flex-wrap:wrap;margin-bottom:22px;border-bottom:3px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:14px}
+.brand .mark-logo{height:22px;width:auto;display:block;flex:none}
+.brand .brand-sep{width:1px;height:30px;background:rgba(255,255,255,.22);flex:none}
+.brand h1{font-family:'Outfit','Mulish',sans-serif;font-size:15px;font-weight:300;letter-spacing:.2em;text-transform:uppercase}
+.brand .sub{font-size:11px;color:rgba(255,255,255,.62);letter-spacing:.05em;margin-top:2px}
+.who{font-size:12px;color:rgba(255,255,255,.7);text-align:right;display:flex;align-items:center;gap:12px}
+.who b{display:block;color:#fff;font-weight:500}
+.who button{background:transparent;border:1px solid rgba(255,255,255,.3);color:rgba(255,255,255,.9);font:inherit;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer}
+.who button:hover{background:rgba(255,255,255,.12)}
+.topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+h2{font-family:'Outfit','Mulish',sans-serif;font-weight:300;font-size:22px}
+.btn-novo{background:var(--apex);color:#fff;border:none;font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;display:none;align-items:center;gap:7px}
+.btn-novo:hover{background:#4a4945}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);margin-bottom:20px;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{padding:16px 17px}
+.kpi + .kpi{border-left:1px solid rgba(247,165,26,.55)}
+.kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-mute);font-weight:500}
+.kpi .v{font-family:'Outfit',sans-serif;font-size:28px;font-weight:300;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .s{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.ecard{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:box-shadow .15s,transform .15s;display:flex;flex-direction:column;text-decoration:none;color:inherit}
+/* Lápis de edição: só existe para admin (.on) e fica SEMPRE visível.
+   Escondê-lo até o hover economiza um pixel e custa o botão inteiro —
+   em telefone não existe hover, e no desktop ninguém acha o que não aparece. */
+.ecard .ed{position:absolute;top:13px;right:12px;width:29px;height:29px;border-radius:7px;border:1px solid var(--line);
+  background:#fff;color:var(--ink-mute);font:inherit;font-size:14px;line-height:1;cursor:pointer;padding:0;
+  display:none;align-items:center;justify-content:center;transition:border-color .15s,color .15s}
+.ecard .ed.on{display:flex}
+.ecard .ed:hover{border-color:var(--accent);color:var(--accent)}
+.ecard .ed:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* espaço para o lápis não encostar no nome */
+.ecard .ed.on ~ .body .tt{padding-right:26px}
+.ecard:hover{box-shadow:0 6px 20px rgba(0,0,0,.07);transform:translateY(-2px)}
+.ecard .top{height:5px;background:var(--c,#8b8a85)}
+.ecard .body{padding:15px 16px 16px}
+.ecard .tt{display:flex;align-items:flex-start;gap:9px}
+.ecard .chip{width:10px;height:10px;border-radius:3px;background:var(--c,#8b8a85);margin-top:5px;flex:none}
+.ecard h3{font-size:15px;font-weight:600}
+.ecard .tipo{font-size:11px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.07em;margin-top:2px}
+.ecard .end{font-size:12px;color:var(--ink-soft);margin-top:8px;min-height:18px}
+.ecard dl{display:grid;grid-template-columns:1fr 1fr;gap:10px 8px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.ecard dt{font-size:10.5px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.06em}
+.ecard dd{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:1px}
+.meter{height:6px;background:#eeece6;border-radius:999px;overflow:hidden;margin-top:12px}
+.meter i{display:block;height:100%;background:var(--c,#8b8a85);border-radius:999px}
+.mlab{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-top:5px}
+.badges{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.b{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:500}
+.b.warn{background:var(--warn-soft);color:var(--warn)}
+.b.good{background:var(--good-soft);color:var(--good)}
+.b.mute{background:#efede7;color:var(--ink-soft)}
+.loading{color:var(--ink-mute);padding:40px;text-align:center}
+
+/* ===== Precisa de você — pendências do portfólio inteiro ===== */
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:11px}
+.sec-head .meta{font-size:12px;color:var(--ink-mute)}
+.sec-head .meta button{background:none;border:none;font:inherit;font-size:12px;font-weight:600;
+  color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+.pend{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-bottom:26px}
+.pend a{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+  display:flex;flex-direction:column;gap:9px;text-decoration:none;color:inherit;
+  transition:box-shadow .15s,transform .15s}
+.pend a:hover{box-shadow:0 6px 20px rgba(0,0,0,.07);transform:translateY(-2px)}
+.pend a.critico{border-left:3px solid var(--crit)}
+.pend a.alto{border-left:3px solid var(--warn)}
+.pend .u{display:flex;align-items:center;gap:7px;font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.07em;font-weight:700}
+.pend a.critico .u{color:var(--crit)}
+.pend a.alto .u{color:var(--warn)}
+.pend .t{font-size:14px;font-weight:600;line-height:1.35}
+.pend .d{font-size:12px;color:var(--ink-soft);line-height:1.45}
+/* margin-top:auto encosta o rodapé na base: sem isso, um título de duas
+   linhas desalinha o filete divisor entre os cards vizinhos. */
+.pend .foot{display:flex;align-items:center;gap:7px;margin-top:auto;padding-top:10px;
+  border-top:1px solid var(--line-soft,#e9eff1);font-size:11.5px;color:var(--ink-soft)}
+.pend .foot .c{width:9px;height:9px;border-radius:3px;flex:none}
+.pend .foot svg{margin-left:auto;flex:none}
+.pend-vazio{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:14px 16px;display:flex;align-items:center;gap:10px;font-size:13px;
+  color:var(--ink-soft);margin-bottom:26px}
+
+
+/* ===== Wizard ===== */
+.wiz-back{position:fixed;inset:0;background:rgba(30,29,26,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:100;overflow:auto}
+.wiz-back.on{display:flex}
+.wiz{background:#fff;border-radius:14px;max-width:760px;width:100%;padding:22px 24px 24px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.wiz h3{font-family:'Outfit','Mulish',sans-serif;font-weight:400;font-size:18px;margin-bottom:4px}
+.wiz .passo{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-mute);margin-bottom:16px}
+.presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.preset{border:1.5px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;background:#fff}
+.preset:hover{border-color:var(--line-strong)}
+.preset.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,146,204,.15)}
+.preset .ic{font-size:19px}
+.preset h4{font-size:13.5px;margin:7px 0 3px}
+.preset p{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:4px}
+.fld label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-mute);font-weight:600;margin-bottom:5px}
+.fld input,.fld select{width:100%;background:#fff;border:1px solid var(--line-strong);border-radius:7px;padding:9px 11px;font:inherit;font-size:13px}
+.fld input:focus,.fld select:focus{outline:2px solid rgba(0,146,204,.35);border-color:var(--accent)}
+.cores{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px}
+.cor{width:26px;height:26px;border-radius:8px;cursor:pointer;border:2px solid transparent}
+.cor.sel{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.wiz-foot{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.wiz-foot .obs{font-size:11.5px;color:var(--ink-mute);max-width:55%}
+.wiz-foot .acts{display:flex;gap:8px}
+.wbtn{font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;border:1px solid var(--line-strong);background:#fff}
+.wbtn.pri{background:var(--apex);color:#fff;border-color:var(--apex)}
+.wbtn.pri:disabled{opacity:.5;cursor:default}
+.wiz-erro{color:var(--crit);font-size:12.5px;margin-top:10px;display:none}
+/* Sugestão de padronização: faixa âmbar (atenção, não comando) */
+.sugestao{display:none;align-items:center;gap:14px;margin-top:14px;padding:12px 14px;
+  background:var(--warn-soft);border-left:3px solid var(--rule);border-radius:8px}
+.sugestao.on{display:flex}
+.sugestao .s-txt{flex:1;min-width:0}
+.sugestao .s-tit{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--warn);font-weight:700;margin-bottom:6px}
+.sugestao .s-prev{font-size:12.5px;color:var(--ink);line-height:1.6;min-width:0}
+.sugestao .s-prev > div + div{margin-top:2px}
+.sugestao .s-prev del{color:var(--ink-mute);text-decoration:line-through;opacity:.75}
+.sugestao .s-prev b{font-weight:600}
+.sugestao .wbtn{flex:none;padding:6px 13px;font-size:12.5px}
+.wiz-foot .obs code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:#eef2f4;padding:1px 5px;border-radius:4px;color:var(--ink-soft)}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
 </head>
 <body>
 <div class="wrap">
 
-<header id="app-header">
-  <div class="header-brand">
-    <img src="./imgs/logo-apex.svg" alt="Apex" class="logo-apex">
+<header>
+  <div class="brand">
+    <img src="./imgs/logo-apex.svg" alt="Apex" class="mark-logo">
     <span class="brand-sep"></span>
-    <div class="titles">
-      <h1 id="emp-nome">Painel de Controle</h1>
-      <div class="sub" id="emp-sub">Carregando…</div>
-    </div>
-    <span id="ctx-seletor"></span>
+    <div><h1>Portfólio</h1><div class="sub">Todos os empreendimentos</div></div>
   </div>
-  <div class="user-menu">
-    <span class="meta">Atualizado em <strong id="today"></strong></span>
-    <button id="btn-portfolio" title="Voltar ao portfólio" style="display:none">⌂ Portfólio</button>
-    <span class="nome" id="user-nome">—</span>
-    <button id="btn-admin" title="Administração de usuários" style="display:none">⚙️ Admin</button>
+  <div class="who">
+    <span><b id="user-nome">—</b>Portfólio</span>
     <button id="btn-logout">Sair</button>
   </div>
 </header>
 
-<!-- Tabs -->
-<div class="tabs" id="tabs">
-  <button class="tab active" data-panel="overview">Visão Geral</button>
-  <button class="tab" data-panel="ocupadas">Lojas Alugadas <span data-counter="ocupadas"></span></button>
-  <button class="tab" data-panel="disponiveis">Lojas Disponíveis <span data-counter="disponiveis"></span></button>
-  <button class="tab" data-panel="inquilinos">Inquilinos <span data-counter="inquilinos"></span></button>
-  <button class="tab" data-panel="propostas">Propostas <span data-counter="propostas"></span></button>
-  <button class="tab" data-panel="leads">Leads <span data-counter="leads"></span></button>
-  <button class="tab" data-panel="financeiro">Financeiro</button>
-  <button class="tab" data-panel="vencimentos">Vencimentos/Renovações</button>
-  <button class="tab" data-panel="alertas">Alertas/Pendências</button>
+<div class="sec-head" id="pend-head" style="display:none">
+  <h2>Precisa de você</h2>
+  <span class="meta" id="pend-meta"></span>
 </div>
+<div id="pend-wrap"></div>
 
-<!-- Banner de alertas (renderizado dinamicamente; só aparece se houver pendências) -->
-<section id="alertas-banner"></section>
-
-<!-- KPIs -->
-<section class="kpis" id="kpis"></section>
-
-<!-- Visão Geral -->
-<div class="panel active" id="overview">
-  <div class="card" id="card-mapa">
-    <div class="card-head">
-      <h2>Mapa do empreendimento — 52 lojas</h2>
-      <button class="btn outline sm" id="btn-mapa-fullscreen">🔍 Maximizar</button>
-    </div>
-    <div class="grid" id="grid"></div>
-    <div class="legend" id="legend"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-head">
-      <h2>📊 Acompanhamento de locação</h2>
-      <span id="acomp-resumo" style="font-size:12px;color:var(--ink-soft)"></span>
-    </div>
-    <div id="acomp-legenda" style="display:flex;gap:14px;font-size:11px;color:var(--ink-soft);margin-bottom:10px"></div>
-    <div id="acomp-tabelas" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px"></div>
-  </div>
-
-  <div class="card">
-    <h2>Funil comercial</h2>
-    <div id="funil-comercial"></div>
-  </div>
-
-  <div class="card">
-    <h2>Ocupação do portfólio</h2>
-    <div id="ocupacao-resumo"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-head">
-      <h2>Composição do mix de inquilinos</h2>
-    </div>
-    <table>
-      <thead><tr><th>Segmento</th><th>Inquilino (razão social)</th><th>Marca / Operação</th><th>Lojas</th></tr></thead>
-      <tbody id="tbl-mix"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Ocupadas -->
-<div class="panel" id="ocupadas">
-  <div class="card">
-    <div class="card-head">
-      <h2 id="ocupadas-titulo">Lojas ocupadas</h2>
-      <button class="btn" id="btn-novo-contrato">+ Novo contrato</button>
-    </div>
-    <div class="sub" style="margin-bottom:12px;color:var(--ink-soft)">
-      Dados extraídos diretamente dos contratos assinados (Quadros Resumo). Clique no PDF para abrir o contrato. Botões de ação por linha.
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Loja</th><th>Inquilino</th><th>Área (m²)</th><th>Aluguel/mês</th><th>Venc.</th><th>Prazo</th>
-          <th>Reajuste</th><th>Garantia</th><th>Início → Término</th><th>Ações</th>
-        </tr>
-      </thead>
-      <tbody id="tbl-ocup"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Disponíveis -->
-<div class="panel" id="disponiveis">
-  <div class="card">
-    <div class="card-head">
-      <h2 id="disponiveis-titulo">Lojas disponíveis para locação</h2>
-      <button class="btn outline" id="btn-editar-areas">📏 Editar características das lojas</button>
-    </div>
-    <div class="sub" style="margin-bottom:12px;color:var(--ink-soft)" id="disponiveis-sub"></div>
-    <table>
-      <thead><tr><th>Loja</th><th>Status</th><th>m²</th><th>Depósito</th><th>Exaustão</th><th>Pipeline</th></tr></thead>
-      <tbody id="tbl-disp"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Inquilinos -->
-<div class="panel" id="inquilinos">
-  <div class="card">
-    <div class="card-head">
-      <h2 id="inquilinos-titulo">Inquilinos ativos</h2>
-      <button class="btn outline" id="btn-novo-inquilino">+ Novo inquilino</button>
-    </div>
-    <div id="tenant-list"></div>
-  </div>
-</div>
-
-<!-- Leads (CRM) -->
-<div class="panel" id="leads">
-  <div class="card">
-    <div class="card-head">
-      <h2 id="leads-titulo">Leads — clientes acompanhando, antes da proposta formal</h2>
-      <button class="btn" id="btn-novo-lead">+ Novo lead</button>
-    </div>
-    <div class="sub" style="margin-bottom:14px;color:var(--ink-soft)">
-      Acompanhe clientes que demonstraram interesse mas ainda não fizeram proposta. Quando o cliente decidir formalizar, use o botão "Converter em proposta" no lead.
-    </div>
-    <div class="financeiro-subtabs" id="leads-filtros" style="margin-bottom:14px">
-      <button class="fin-subtab active" data-lead-filtro="ativos">Ativos <span id="cnt-lead-ativos"></span></button>
-      <button class="fin-subtab" data-lead-filtro="interessado">Interessados <span id="cnt-lead-interessado"></span></button>
-      <button class="fin-subtab" data-lead-filtro="visitou">Visitaram <span id="cnt-lead-visitou"></span></button>
-      <button class="fin-subtab" data-lead-filtro="em_analise">Em análise <span id="cnt-lead-analise"></span></button>
-      <button class="fin-subtab" data-lead-filtro="virou_proposta">Viraram proposta <span id="cnt-lead-virou"></span></button>
-      <button class="fin-subtab" data-lead-filtro="desistiu">Desistiram <span id="cnt-lead-desistiu"></span></button>
-      <button class="fin-subtab" data-lead-filtro="all">Todos <span id="cnt-lead-todos"></span></button>
-    </div>
-    <div id="leads-resumo" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px"></div>
-    <div id="leads-list"></div>
-  </div>
-</div>
-
-<!-- Propostas -->
-<div class="panel" id="propostas">
-  <div class="card">
-    <div class="card-head">
-      <h2 id="propostas-titulo">Propostas ativas — pendentes de decisão ou documentação</h2>
-      <button class="btn" id="btn-nova-proposta">+ Nova proposta</button>
-    </div>
-    <div class="sub" style="margin-bottom:14px;color:var(--ink-soft)">
-      Cada card representa uma proposta. Referências de R$/m²: portfólio R$ 176 (médio ponderado) · conservador R$ 152 · âncora Pague Menos R$ 193.
-    </div>
-    <div class="financeiro-subtabs" id="propostas-filtros" style="margin-bottom:14px">
-      <button class="fin-subtab active" data-prop-filtro="ativas">Ativas <span id="cnt-prop-ativas"></span></button>
-      <button class="fin-subtab" data-prop-filtro="aceita_aguardando_docs">Aceitas <span id="cnt-prop-aceitas"></span></button>
-      <button class="fin-subtab" data-prop-filtro="em_analise">Em análise <span id="cnt-prop-analise"></span></button>
-      <button class="fin-subtab" data-prop-filtro="recusada">Recusadas <span id="cnt-prop-recusadas"></span></button>
-      <button class="fin-subtab" data-prop-filtro="expirada">Expiradas <span id="cnt-prop-expiradas"></span></button>
-      <button class="fin-subtab" data-prop-filtro="convertida_em_contrato">Convertidas <span id="cnt-prop-convertidas"></span></button>
-      <button class="fin-subtab" data-prop-filtro="all">Todas <span id="cnt-prop-todas"></span></button>
-    </div>
-    <div id="propostas-resumo" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px"></div>
-    <div id="propostas-list"></div>
-  </div>
-</div>
-
-<!-- Financeiro -->
-<div class="panel" id="financeiro">
-  <div class="card">
-    <div class="card-head">
-      <h2>💰 Controle financeiro</h2>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="month" id="financeiro-mes" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px">
-        <button class="btn outline" id="btn-financeiro-mes-anterior">‹</button>
-        <button class="btn outline" id="btn-financeiro-mes-proximo">›</button>
-        <!-- Botão "Gerar cobranças do mês" removido: SIENGE é fonte oficial; cobranças vêm do PDF importado pela ficha do contrato -->
-        <span style="font-size:11px;color:#94a3b8;font-style:italic">Cobranças vêm do SIENGE — reimporte o PDF pra atualizar status</span>
-      </div>
-    </div>
-    <div class="financeiro-subtabs" id="financeiro-subtabs">
-      <button class="fin-subtab active" data-fintab="cobrancas">Mês corrente</button>
-      <button class="fin-subtab" data-fintab="inadimplencia">Inadimplência <span id="fin-cnt-inad"></span></button>
-      <button class="fin-subtab" data-fintab="despesas">Despesas</button>
-      <button class="fin-subtab" data-fintab="reajustes">Reajustes</button>
-      <button class="fin-subtab" data-fintab="resumo">Resumo / DRE</button>
-    </div>
-    <div id="fin-conteudo"></div>
-  </div>
-</div>
-
-<!-- Vencimentos -->
-<div class="panel" id="vencimentos">
-
-  <div class="card">
-    <h2>Linha do tempo de vencimentos contratuais</h2>
-    <div class="sub" style="margin-bottom:14px;color:var(--ink-soft)">
-      Cada barra representa a duração total do contrato. A linha vermelha marca a data de hoje. Contratos &gt;= 120 meses em âmbar; parciais em violeta.
-    </div>
-    <div class="timeline-labels">
-      <div>Inquilino</div><div>Vigência</div><div>Vence em</div>
-    </div>
-    <div id="timeline-rows"></div>
-    <div class="timeline-scale" id="timeline-scale"></div>
-  </div>
-
-  <div class="card">
-    <h2>Tabela detalhada de prazos</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Inquilino</th><th>Lojas</th><th>Assinatura</th><th>Início vigência</th>
-          <th>Prazo</th><th>Término</th><th>Meses restantes</th>
-        </tr>
-      </thead>
-      <tbody id="tbl-venc"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Alertas -->
-<div class="panel" id="alertas">
-  <div class="card">
-    <h2>Alertas &amp; pendências</h2>
-    <div id="alertas-list"></div>
-  </div>
-
-  <!-- Legenda: regras de notificação automática -->
-  <div class="card" style="border-left:4px solid var(--accent)">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <span style="font-size:22px">🔔</span>
-      <h2 style="margin:0">Regras de notificação automática</h2>
-    </div>
-    <div class="sub" style="margin-bottom:16px;color:var(--ink-soft);font-size:13px">
-      O sistema gera alertas automáticos com base nos contratos, documentos cadastrados, leads e propostas. As regras abaixo definem quando cada tipo de alerta é disparado e com qual urgência.
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:16px">
-
-      <div style="padding:14px;background:#f8fafc;border:1px solid var(--line);border-radius:8px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-          <span style="font-size:16px">📄</span>
-          <strong style="color:#1e40af;font-size:13px;text-transform:uppercase;letter-spacing:0.05em">Contratual</strong>
-        </div>
-        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink)">
-          <li><strong>Renovação de contrato</strong> — aviso disparado <strong>180, 90, 60 e 30 dias</strong> antes do término.</li>
-          <li><strong>Reajuste anual</strong> — aviso <strong>30, 15 e 7 dias</strong> antes do aniversário do contrato.</li>
-          <li><strong>Marco de 5 anos</strong> — gatilho da <strong>ação renovatória</strong> (Lei 8.245/91).</li>
-        </ul>
-      </div>
-
-      <div style="padding:14px;background:#f8fafc;border:1px solid var(--line);border-radius:8px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-          <span style="font-size:16px">📋</span>
-          <strong style="color:#a16207;font-size:13px;text-transform:uppercase;letter-spacing:0.05em">Documental</strong>
-        </div>
-        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink)">
-          <li><strong>Seguros</strong> (fiança, incêndio) — aviso <strong>60, 30, 15 e 7 dias</strong> antes do vencimento da apólice.</li>
-          <li><strong>Certidões negativas</strong> (federal, municipal, estadual, trabalhista) — mesma régua. Vencidas há até 30d continuam aparecendo.</li>
-          <li><strong>AVCB</strong> e <strong>alvará</strong> de funcionamento — mesma régua.</li>
-          <li><strong>Vistorias</strong> (inicial / final) — alerta quando a validade se aproxima.</li>
-        </ul>
-        <div style="margin-top:8px;font-size:11px;color:var(--ink-soft);font-style:italic">Cadastre documentos editando cada contrato → seção &quot;Documentos do contrato&quot;.</div>
-      </div>
-
-      <div style="padding:14px;background:#f8fafc;border:1px solid var(--line);border-radius:8px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-          <span style="font-size:16px">💼</span>
-          <strong style="color:#15803d;font-size:13px;text-transform:uppercase;letter-spacing:0.05em">Comercial</strong>
-        </div>
-        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink)">
-          <li><strong>Lead parado</strong> — sem interação registrada há mais de <strong>30 dias</strong>. Após 60d vira urgência alta.</li>
-          <li><strong>Proposta aceita aguardando documentação</strong> — quando passa de <strong>7 dias</strong> sem fechar contrato.</li>
-          <li><strong>Proposta em análise parada</strong> — sem decisão do cliente há mais de <strong>14 dias</strong>.</li>
-        </ul>
-      </div>
-
-    </div>
-
-    <div style="padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:8px">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);font-weight:600;margin-bottom:8px">Régua de urgência</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <span style="background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">🔴 Crítico</span>
-        <span style="font-size:12px;color:var(--ink-soft)">vencimento ≤ 7 dias (ou já vencido)</span>
-        <span style="margin:0 4px;color:#cbd5e1">·</span>
-        <span style="background:#ffedd5;color:#c2410c;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">🟠 Alto</span>
-        <span style="font-size:12px;color:var(--ink-soft)">≤ 30 dias</span>
-        <span style="margin:0 4px;color:#cbd5e1">·</span>
-        <span style="background:#fef9c3;color:#a16207;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">🟡 Médio</span>
-        <span style="font-size:12px;color:var(--ink-soft)">≤ 60–90 dias</span>
-        <span style="margin:0 4px;color:#cbd5e1">·</span>
-        <span style="background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">🟢 Baixo</span>
-        <span style="font-size:12px;color:var(--ink-soft)">monitoramento (180 dias)</span>
-      </div>
-    </div>
-
-    <div style="margin-top:12px;font-size:11px;color:var(--ink-soft);font-style:italic">
-      Os alertas ficam disponíveis no Chat IA — pergunte &quot;tem seguro vencendo?&quot;, &quot;quem precisa renovar?&quot; — e em breve em sininho dedicado e e-mail diário às 8h.
-    </div>
-  </div>
-</div>
-
-</div>
-
-<!-- Modal full-screen pra mapa -->
-<div id="mapa-fullscreen" class="mapa-fs" style="display:none">
-  <div class="mapa-fs-header">
-    <h2>🗺️ Mapa do empreendimento — Tela cheia</h2>
-    <button class="btn outline" id="btn-mapa-fechar">✕ Fechar</button>
-  </div>
-  <div class="mapa-fs-body">
-    <div class="grid" id="grid-fs"></div>
-    <div class="legend" id="legend-fs"></div>
-  </div>
-</div>
-
-<!-- Container de toasts -->
-<div id="toast-container"></div>
-
-<!-- Chat widget flutuante (canto inferior direito) -->
-<div id="chat-widget" class="chat-widget">
-  <button class="chat-widget-trigger" id="chat-widget-trigger" aria-label="Abrir chat com IA">
-    <span class="chat-widget-icon"><span class="chat-widget-ia">IA</span><span class="chat-widget-x">×</span></span>
-    <span class="chat-widget-pulse"></span>
+<div class="topo">
+  <h2>Empreendimentos</h2>
+  <button class="btn-novo" id="btn-novo-emp">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    Novo empreendimento
   </button>
-  <div class="chat-widget-painel" id="chat-widget-painel">
-    <div class="chat-widget-header">
-      <div class="chat-widget-titulo">
-        <span class="chat-widget-avatar">✨</span>
-        <div>
-          <div class="chat-widget-nome">Claude · Assistente IA</div>
-          <div class="chat-widget-status-txt">Pergunte sobre o portfólio</div>
-        </div>
+</div>
+<div class="kpis" id="kpis"></div>
+<div class="grid" id="cards"><div class="loading">Carregando empreendimentos…</div></div>
+
+</div>
+
+<!-- ===== Editar cadastro do empreendimento ===== -->
+<div class="wiz-back" id="ed-back">
+  <div class="wiz" style="max-width:580px">
+    <h3>Editar cadastro</h3>
+    <div class="passo" id="ed-passo">—</div>
+
+    <div class="frm">
+      <div class="fld" style="grid-column:1/-1"><label>Nome do empreendimento</label><input id="e-nome"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Endereço</label><input id="e-endereco" placeholder="Rua / rodovia, número"></div>
+      <div class="fld"><label>Cidade</label><input id="e-cidade" placeholder="Brasília"></div>
+      <div class="fld"><label>UF</label><input id="e-uf" maxlength="2" placeholder="DF"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Proprietária (locadora)</label><input id="e-prop" placeholder="Razão social"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Cor de identificação</label><div class="cores" id="e-cores"></div></div>
+    </div>
+
+    <div class="sugestao" id="ed-sugestao">
+      <div class="s-txt">
+        <div class="s-tit">Padronizar a escrita</div>
+        <div class="s-prev" id="ed-prev"></div>
       </div>
-      <button class="chat-widget-close" id="chat-widget-close" aria-label="Fechar">×</button>
+      <button class="wbtn" id="ed-aplicar" type="button">Aplicar</button>
     </div>
-    <div class="chat-widget-body">
-      <div id="chat-widget-mensagens"></div>
+
+    <div class="wiz-erro" id="ed-erro"></div>
+
+    <div class="wiz-foot">
+      <span class="obs">O endereço na web (<code id="ed-slug">—</code>) não muda ao renomear, para não quebrar links já salvos.</span>
+      <span class="acts">
+        <button class="wbtn" id="ed-cancelar">Cancelar</button>
+        <button class="wbtn pri" id="ed-salvar">Salvar</button>
+      </span>
     </div>
-    <div class="chat-widget-sugestoes-box">
-      <div id="chat-widget-sugestoes"></div>
-    </div>
-    <form id="chat-widget-form" class="chat-widget-form">
-      <textarea id="chat-widget-input" placeholder="Pergunte algo..." rows="1"></textarea>
-      <button type="submit" id="chat-widget-enviar" aria-label="Enviar">↑</button>
-    </form>
   </div>
 </div>
 
-<!-- App bootstrap — BUILD 20260623A (cache bust pós-recovery) -->
+<!-- ===== Wizard de novo empreendimento ===== -->
+<div class="wiz-back" id="wiz-back">
+  <div class="wiz">
+    <h3 id="wiz-titulo">Novo empreendimento</h3>
+    <div class="passo" id="wiz-passo">Passo 1 de 3 · Tipologia</div>
+
+    <div id="wiz-p1">
+      <div class="presets" id="wiz-presets"></div>
+    </div>
+
+    <div id="wiz-p2" style="display:none">
+      <div class="frm">
+        <div class="fld" style="grid-column:1/-1"><label>Nome do empreendimento</label><input id="w-nome" placeholder="Ex.: Galpões Apex — Cidade Ocidental"></div>
+        <div class="fld"><label>Endereço</label><input id="w-endereco" placeholder="Rua / rodovia, número"></div>
+        <div class="fld"><label>Cidade</label><input id="w-cidade" placeholder="Brasília"></div>
+        <div class="fld"><label>UF</label><input id="w-uf" maxlength="2" placeholder="DF"></div>
+        <div class="fld"><label>Proprietária (locadora)</label><input id="w-prop" placeholder="Razão social"></div>
+        <div class="fld" style="grid-column:1/-1"><label>Cor de identificação</label><div class="cores" id="w-cores"></div></div>
+      </div>
+    </div>
+
+    <div id="wiz-p3" style="display:none">
+      <div class="frm">
+        <div class="fld"><label>Quantidade de unidades</label><input id="w-qtd" type="number" min="1" max="500" value="6"></div>
+        <div class="fld"><label>Primeiro código</label><input id="w-cod1" value="01"></div>
+        <div class="fld"><label>Área privativa padrão (m²)</label><input id="w-area" type="number" min="0" step="0.01" placeholder="opcional"></div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-mute);margin-top:12px">As unidades são criadas em sequência a partir do primeiro código (01, 02, 03…). Área, matrícula e atributos específicos podem ser ajustados depois, unidade a unidade, dentro do empreendimento.</p>
+    </div>
+
+    <div class="wiz-erro" id="wiz-erro"></div>
+
+    <div class="wiz-foot">
+      <span class="obs" id="wiz-obs"></span>
+      <span class="acts">
+        <button class="wbtn" id="wiz-cancelar">Cancelar</button>
+        <button class="wbtn" id="wiz-voltar" style="display:none">← Voltar</button>
+        <button class="wbtn pri" id="wiz-avancar" disabled>Avançar →</button>
+      </span>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { requireAuth, getCurrentUser, signOut } from './js/auth.js';
-import { setState, getState } from './js/state.js'; // state global compartilhado (substitui window._*)
-import { renderTudo, mostrarToast } from './js/render.js';
-import { abrirFormContrato } from './js/forms-contrato.js';
-import { abrirFormProposta } from './js/forms-proposta.js';
-import { abrirFormInquilino } from './js/forms-inquilino.js';
-import { abrirFormAreasLojas } from './js/forms-lojas.js';
-import { abrirFormLead } from './js/forms-lead.js';
-import { abrirFormDespesa, abrirFormFornecedor } from './js/forms-financeiro.js';
-import { renderFinanceiro, setFinSubtab, setFinMes } from './js/financeiro-view.js';
-import { initChatWidget } from './js/chat-widget.js';
-import { abrirAdminUsuarios } from './js/forms-admin.js';
-import { getMeuPapel } from './js/data-layer.js';
-import { initContexto, listEmpreendimentos, montarSeletor } from './js/contexto.js';
+import { listEmpreendimentos } from './js/contexto.js';
+import { getSupabase } from './js/supabase-client.js';
+import { getMeuPapel, getEmpreendimento, atualizarEmpreendimento, getAlertasPortfolio } from './js/data-layer.js';
+import { padronizarNome, precisaPadronizar, padronizarUF } from './js/texto.js';
 
-// 1. Verifica autenticação
-await requireAuth();
+const fmtBRL = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+const PRESET_LABEL = {
+  comercial_rua: 'Comercial de rua',
+  galpao_logistico: 'Galpão logístico',
+  residencial_multifamiliar: 'Residencial multifamiliar',
+  misto: 'Misto',
+  avulso: 'Unidade avulsa'
+};
 
-// 1.5 Resolve o EMPREENDIMENTO em contexto (Etapa B — multi-portfólio).
-//     Precisa acontecer antes de qualquer carga de dados: a data-layer
-//     filtra todas as queries pelo contexto atual.
-const empAtual = await initContexto();
-if (empAtual) {
-  document.title = `${empAtual.nome} — Apex Locações`;
-  document.getElementById('emp-nome').textContent = empAtual.nome;
-  const temVagas = (empAtual.vagas || 0) > 0;
-  document.getElementById('emp-sub').textContent = [
-    [empAtual.endereco, empAtual.cidade && empAtual.uf ? `${empAtual.cidade}/${empAtual.uf}` : empAtual.cidade].filter(Boolean).join(', '),
-    `${empAtual.unidades} unidades${temVagas ? ` · ${empAtual.vagas} vagas` : ''}`
-  ].filter(Boolean).join(' · ');
-  // A marca da casa é a Apex, fixa. A identidade do empreendimento entra
-  // pela cor: faixa sob o cabeçalho e ponto no seletor (--ctx).
-  document.documentElement.style.setProperty('--ctx', empAtual.cor || 'var(--rule)');
-  montarSeletor(document.getElementById('ctx-seletor'));
+// ---------------------------------------------------------------------
+// Presets do wizard — cada um define o comportamento padrão do
+// empreendimento (config JSONB) e o tipo das unidades geradas.
+// ---------------------------------------------------------------------
+const PRESETS = [
+  { key:'comercial_rua', ic:'🏬', nome:'Comercial de rua', desc:'Lojas em edifício, como o Union 511.',
+    tipo:'loja', finalidade:'comercial', cor:'#eb6834',
+    config:{ planta_baixa:false, prazo_padrao_meses:60, indice_padrao:'IGP-M', tem_vagas:true,
+             nomenclatura_unidade:'Loja', nomenclatura_unidades:'Lojas',
+             label_ocupadas:'Lojas Alugadas', label_disponiveis:'Lojas Disponíveis' } },
+  { key:'galpao_logistico', ic:'🏭', nome:'Galpão logístico', desc:'Poucas unidades grandes, contratos longos.',
+    tipo:'galpao', finalidade:'comercial', cor:'#2a78d6',
+    config:{ planta_baixa:false, prazo_padrao_meses:120, indice_padrao:'IGP-M', tem_vagas:false,
+             nomenclatura_unidade:'Galpão', nomenclatura_unidades:'Galpões',
+             label_ocupadas:'Galpões Ocupados', label_disponiveis:'Galpões Disponíveis' } },
+  { key:'residencial_multifamiliar', ic:'🏢', nome:'Residencial multifamiliar', desc:'Apartamentos em um ou mais blocos.',
+    tipo:'apartamento', finalidade:'residencial', cor:'#1baf7a',
+    config:{ planta_baixa:false, prazo_padrao_meses:30, indice_padrao:'IGP-M', tem_vagas:false,
+             nomenclatura_unidade:'Apartamento', nomenclatura_unidades:'Apartamentos',
+             label_ocupadas:'Apartamentos Alugados', label_disponiveis:'Apartamentos Disponíveis' } },
+  { key:'misto', ic:'🏙️', nome:'Misto', desc:'Lojas e apartamentos no mesmo prédio.',
+    tipo:'loja', finalidade:'mista', cor:'#eda100',
+    config:{ planta_baixa:false, prazo_padrao_meses:60, indice_padrao:'IGP-M', tem_vagas:false,
+             nomenclatura_unidade:'Unidade', nomenclatura_unidades:'Unidades',
+             label_ocupadas:'Unidades Ocupadas', label_disponiveis:'Unidades Disponíveis' } },
+  { key:'avulso', ic:'🔑', nome:'Unidade avulsa', desc:'Um imóvel só, sem prédio a administrar.',
+    tipo:'apartamento', finalidade:'residencial', cor:'#4a3aa7', qtdFixa:1,
+    config:{ planta_baixa:false, prazo_padrao_meses:30, indice_padrao:'IGP-M', tem_vagas:false, avulso:true,
+             nomenclatura_unidade:'Unidade', nomenclatura_unidades:'Unidades',
+             label_ocupadas:'Unidades Ocupadas', label_disponiveis:'Unidades Disponíveis' } },
+];
+const CORES = ['#eb6834','#2a78d6','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'];
 
-  // ===== Etapa C: comportamento por preset (config do empreendimento) =====
-  const cfg = empAtual.config || {};
-  // Planta baixa: só quem tem planta cadastrada exibe o mapa
-  if (cfg.planta_baixa !== true) {
-    const cm = document.getElementById('card-mapa');
-    if (cm) cm.style.display = 'none';
-    const bm = document.getElementById('btn-mapa-fullscreen');
-    if (bm) bm.style.display = 'none';
-  } else {
-    const h2m = document.querySelector('#card-mapa h2');
-    if (h2m) h2m.textContent = `Mapa do empreendimento — ${empAtual.unidades} ${String(cfg.nomenclatura_unidades || 'unidades').toLowerCase()}`;
+// ---------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------
+let _user = null;
+let _admin = false;
+
+async function boot() {
+  // Link antigo (index.html?emp=slug) — antes da troca, o index ERA o painel do
+  // imóvel. O slug foi mantido congelado justamente para não quebrar favorito,
+  // então aqui a gente honra isso e encaminha em vez de ignorar o parâmetro.
+  // ?stay=1 força ficar no portfólio mesmo com um slug na URL — é a válvula
+  // de escape para inspecionar a lista sem ser levado direto ao imóvel.
+  const qs = new URLSearchParams(location.search);
+  if (qs.has('emp') && !qs.has('stay')) {
+    location.replace('./empreendimento.html?emp=' + encodeURIComponent(qs.get('emp')));
+    return;
   }
-  // Nomenclatura das abas segue o preset (Lojas / Galpões / Apartamentos / Unidades)
-  const setTab = (panel, txt) => {
-    const b = document.querySelector(`.tab[data-panel="${panel}"]`);
-    if (b && txt) b.childNodes[0].textContent = txt + ' ';
-  };
-  setTab('ocupadas', cfg.label_ocupadas);
-  setTab('disponiveis', cfg.label_disponiveis);
 
-  // Botão Portfólio: sempre para admin; para os demais, quando houver 2+ empreendimentos
-  Promise.all([listEmpreendimentos(), getMeuPapel().catch(() => null)]).then(([emps, papel]) => {
-    if (emps.length > 1 || papel === 'admin') {
-      const btn = document.getElementById('btn-portfolio');
-      btn.style.display = '';
-      btn.addEventListener('click', () => { window.location.href = './portfolio.html?stay=1&r=' + Date.now(); });
-    }
-  }).catch(() => {});
-} else {
-  document.getElementById('emp-sub').textContent = 'Nenhum empreendimento acessível para este usuário.';
-}
+  await requireAuth();
+  _user = await getCurrentUser();
+  document.getElementById('user-nome').textContent = _user?.nome || _user?.email || '—';
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    await signOut(); location.href = './login.html';
+  });
 
-// 2. Carrega usuário
-const user = await getCurrentUser();
-document.getElementById('user-nome').textContent = user?.nome || user?.email || '—';
-document.getElementById('today').textContent = new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  const emps = await listEmpreendimentos(true);
 
-// 3. Logout
-document.getElementById('btn-logout').addEventListener('click', async () => {
-  await signOut();
-  window.location.href = './login.html';
-});
+  // O portfólio é a porta de entrada, sempre — inclusive para quem só tem um
+  // empreendimento. Antes havia um atalho que pulava direto para o painel; ele
+  // saiu de propósito: escondia a existência do portfólio de quem tem um imóvel
+  // só, e fazia o app mudar de comportamento sozinho no dia em que essa pessoa
+  // ganhasse acesso a um segundo. Quem quer ir direto usa ?emp=slug.
+  // A lista já vem restrita pelo RLS: cada um enxerga apenas os seus.
 
-// 3.1 Mostrar botão Admin só se o usuário for admin
-(async () => {
+  // Botão de novo empreendimento: só admin.
+  // Usa a MESMA checagem do botão Admin do app (RPC user_role) — o caminho
+  // via perfil espalhado no getCurrentUser se mostrou menos confiável.
   try {
-    const papel = await getMeuPapel();
-    if (papel === 'admin') {
-      const btnAdmin = document.getElementById('btn-admin');
-      btnAdmin.style.display = '';
-      btnAdmin.addEventListener('click', () => abrirAdminUsuarios());
+    const papel = _user?.role === 'admin' ? 'admin' : await getMeuPapel();
+    _admin = papel === 'admin';
+    if (_admin) {
+      const b = document.getElementById('btn-novo-emp');
+      // display explícito: a classe .btn-novo esconde por padrão, então
+      // limpar o inline ('' ) NÃO basta — a regra da classe voltaria a valer.
+      b.style.display = 'inline-block';
+      b.addEventListener('click', abrirWizard);
     }
-  } catch (e) { /* fail silently — usuário sem papel não vê admin */ }
-})();
+  } catch (e) { console.warn('papel:', e); }
 
-// 4. Tabs
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(tab.dataset.panel).classList.add('active');
-    if (tab.dataset.panel === 'financeiro') renderFinanceiro();
-  });
-});
+  renderPortfolio(emps);
 
-// 4.5 Sub-tabs da aba Financeiro
-document.querySelectorAll('.fin-subtab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.fin-subtab').forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    setFinSubtab(t.dataset.fintab);
-  });
-});
-const inpMes = document.getElementById('financeiro-mes');
-const mesAtual = new Date().toISOString().slice(0, 7);
-if (inpMes) {
-  inpMes.value = mesAtual;
-  inpMes.addEventListener('change', () => setFinMes(inpMes.value));
+  // Pendências não seguram a tela: os cards já estão desenhados quando elas chegam.
+  getAlertasPortfolio()
+    .then(alertas => renderPendencias(alertas, emps))
+    .catch(err => { console.warn('alertas:', err); document.getElementById('pend-head').style.display = 'none'; });
 }
-document.getElementById('btn-financeiro-mes-anterior')?.addEventListener('click', () => {
-  const [a,m] = inpMes.value.split('-').map(Number);
-  const d = new Date(a, m - 2, 1);
-  inpMes.value = d.toISOString().slice(0, 7);
-  setFinMes(inpMes.value);
-});
-document.getElementById('btn-financeiro-mes-proximo')?.addEventListener('click', () => {
-  const [a,m] = inpMes.value.split('-').map(Number);
-  const d = new Date(a, m, 1);
-  inpMes.value = d.toISOString().slice(0, 7);
-  setFinMes(inpMes.value);
-});
-// Botão "Gerar cobranças do mês" foi REMOVIDO — SIENGE é fonte oficial das cobranças.
-// O handler foi deixado neutro pra evitar erro caso algum elemento legado dispare o evento.
 
-// 5. Botoes CRUD
-document.getElementById('btn-novo-contrato').addEventListener('click', () => abrirFormContrato());
-document.getElementById('btn-novo-inquilino').addEventListener('click', () => abrirFormInquilino());
-document.getElementById('btn-editar-areas').addEventListener('click', () => abrirFormAreasLojas());
-document.getElementById('btn-novo-lead').addEventListener('click', () => abrirFormLead());
-document.getElementById('btn-nova-proposta').addEventListener('click', () => abrirFormProposta());
+// ---------------------------------------------------------------------
+// Precisa de você — pendências do portfólio
+// ---------------------------------------------------------------------
+// Esta é a razão de a home existir como tela de chegada: sem ela, uma
+// pendência crítica só aparece para quem entra no empreendimento certo.
+const TETO = 3;                  // quantas mostrar antes do "ver todas"
+let _pendAberto = false;
 
-// 5.6 Filtros da aba Propostas
-document.querySelectorAll('[data-prop-filtro]').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    document.querySelectorAll('[data-prop-filtro]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    setState('propostasFiltro', btn.dataset.propFiltro);
-    const { renderTudo } = await import('./js/render.js');
-    await renderTudo();
-  });
+const ICONE = {
+  critico: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/>',
+  alto:    '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
+};
+
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function renderPendencias(alertas, emps) {
+  const wrap = document.getElementById('pend-wrap');
+  const head = document.getElementById('pend-head');
+  const meta = document.getElementById('pend-meta');
+  head.style.display = 'flex';
+
+  if (!alertas.total) {
+    meta.textContent = '';
+    wrap.innerHTML = '<div class="pend-vazio">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' +
+      'Nada pendente no portfólio.</div>';
+    return;
+  }
+
+  const porId = new Map(emps.map(e => [e.empreendimento_id, e]));
+  const mostrar = _pendAberto ? alertas.itens : alertas.itens.slice(0, TETO);
+
+  wrap.innerHTML = '<div class="pend">' + mostrar.map(a => {
+    const emp = porId.get(a.empreendimento_id);
+    const urg = a.urgencia === 'critico' ? 'critico' : 'alto';
+    const selo = urg === 'critico' ? 'Crítico'
+      : (a.dias_para_evento != null && a.dias_para_evento < 0)
+        ? Math.abs(a.dias_para_evento) + ' dias em atraso' : 'Atenção';
+    // sem ?tab= ainda: o empreendimento.html não lê esse parâmetro hoje
+    const href = emp ? './empreendimento.html?emp=' + encodeURIComponent(emp.slug) : '#';
+    return '<a class="' + urg + '" href="' + href + '">' +
+      '<span class="u"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">' + ICONE[urg] + '</svg>' + esc(selo) + '</span>' +
+      '<span class="t">' + esc(a.titulo) + '</span>' +
+      (a.descricao ? '<span class="d">' + esc(a.descricao) + '</span>' : '') +
+      '<span class="foot">' +
+        '<span class="c" style="background:' + (emp?.cor || 'var(--ink-mute)') + '"></span>' +
+        esc(emp?.nome || 'Empreendimento') +
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-mute)" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>' +
+      '</span></a>';
+  }).join('') + '</div>';
+
+  const resumo = alertas.criticos
+    ? alertas.criticos + (alertas.criticos > 1 ? ' críticas' : ' crítica') + ' de ' + alertas.total
+    : alertas.total + (alertas.total > 1 ? ' pendências' : ' pendência');
+
+  if (alertas.total > TETO) {
+    meta.innerHTML = esc(resumo) + ' · <button type="button" id="pend-toggle">' +
+      (_pendAberto ? 'mostrar só as ' + TETO + ' primeiras' : 'ver todas') + '</button>';
+    document.getElementById('pend-toggle').addEventListener('click', () => {
+      _pendAberto = !_pendAberto;
+      renderPendencias(alertas, emps);
+    });
+  } else {
+    meta.textContent = resumo;
+  }
+}
+
+function renderPortfolio(emps) {
+  const receita = emps.reduce((s, e) => s + Number(e.receita_mes || 0), 0);
+  const unid    = emps.reduce((s, e) => s + (e.unidades || 0), 0);
+  const ocup    = emps.reduce((s, e) => s + (e.unidades_ocupadas || 0), 0);
+  const contr   = emps.reduce((s, e) => s + (e.contratos_ativos || 0), 0);
+  const venc90  = emps.reduce((s, e) => s + (e.vencendo_90d || 0), 0);
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="l">Receita mensal</div><div class="v">${fmtBRL(receita)}</div><div class="s">${emps.length} empreendimento${emps.length !== 1 ? 's' : ''}</div></div>
+    <div class="kpi"><div class="l">Unidades</div><div class="v">${unid}</div><div class="s">portfólio inteiro</div></div>
+    <div class="kpi"><div class="l">Ocupação global</div><div class="v">${unid ? Math.round(ocup / unid * 100) : 0}%</div><div class="s">${ocup} de ${unid} ocupadas</div></div>
+    <div class="kpi"><div class="l">Contratos ativos</div><div class="v">${contr}</div><div class="s">${venc90} vencem em 90 dias</div></div>
+    <div class="kpi"><div class="l">Propostas ativas</div><div class="v">${emps.reduce((s, e) => s + (e.propostas_ativas || 0), 0)}</div><div class="s">em análise ou aceitas</div></div>`;
+
+  document.getElementById('cards').innerHTML = emps.map(e => {
+    const pct = e.unidades ? Math.round(e.unidades_ocupadas / e.unidades * 100) : 0;
+    const temVagas = (e.vagas || 0) > 0;
+    return `
+    <a class="ecard" style="--c:${e.cor}" href="./empreendimento.html?emp=${encodeURIComponent(e.slug)}">
+      <button class="ed${_admin ? ' on' : ''}" data-ed="${e.empreendimento_id}" title="Editar cadastro de ${e.nome}" aria-label="Editar cadastro de ${e.nome}">✎</button>
+      <div class="top"></div>
+      <div class="body">
+        <div class="tt"><span class="chip"></span><div>
+          <h3>${e.nome}</h3>
+          <div class="tipo">${PRESET_LABEL[e.preset] || e.preset}</div>
+        </div></div>
+        <div class="end">${[e.endereco, e.cidade && e.uf ? e.cidade + '/' + e.uf : e.cidade].filter(Boolean).join(' · ')}</div>
+        <dl>
+          <dt>Unidades</dt><dt>Receita/mês</dt>
+          <dd>${e.unidades}${temVagas ? ` <span style="font-weight:400;font-size:12px;color:var(--ink-mute)">+ ${e.vagas} vagas</span>` : ''}</dd>
+          <dd>${fmtBRL(e.receita_mes)}</dd>
+        </dl>
+        <div class="meter"><i style="width:${pct}%"></i></div>
+        <div class="mlab"><span>Ocupação</span><b>${pct}% · ${e.unidades_ocupadas} de ${e.unidades}</b></div>
+        <div class="badges">
+          ${e.vencendo_90d ? `<span class="b warn">${e.vencendo_90d} vencimento${e.vencendo_90d > 1 ? 's' : ''} em 90d</span>` : '<span class="b good">sem vencimentos próximos</span>'}
+          <span class="b mute">${e.inquilinos_ativos} inquilino${e.inquilinos_ativos !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+const $ = id => document.getElementById(id);
+
+// ---------------------------------------------------------------------
+// Editar cadastro
+// ---------------------------------------------------------------------
+// O lápis mora dentro do <a> do card, então o clique precisa ser
+// interceptado antes de virar navegação.
+document.getElementById('cards').addEventListener('click', ev => {
+  const btn = ev.target.closest('[data-ed]');
+  if (!btn) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  abrirEdicao(btn.getAttribute('data-ed'));
 });
 
-// 5.7 Filtros da aba Leads
-document.querySelectorAll('[data-lead-filtro]').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    document.querySelectorAll('[data-lead-filtro]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    setState('leadsFiltro', btn.dataset.leadFiltro);
-    const { renderTudo } = await import('./js/render.js');
-    await renderTudo();
-  });
+const ed = { id: null, cor: null };
+const CAMPOS_TXT = [['e-nome', 'Nome'], ['e-endereco', 'Endereço'], ['e-cidade', 'Cidade']];
+
+function pintarCores(container, selecionada, onPick) {
+  container.innerHTML = CORES.map(c =>
+    `<span class="cor${c === selecionada ? ' sel' : ''}" data-c="${c}" style="background:${c}"></span>`).join('');
+  container.querySelectorAll('.cor').forEach(s => s.addEventListener('click', () => {
+    container.querySelectorAll('.cor').forEach(x => x.classList.remove('sel'));
+    s.classList.add('sel');
+    onPick(s.dataset.c);
+  }));
+}
+
+/** Mostra o que a padronização mudaria, campo a campo, antes de mexer em nada. */
+function revisarPadronizacao() {
+  const linhas = [];
+  for (const [id, rot] of CAMPOS_TXT) {
+    const atual = $(id).value;
+    if (precisaPadronizar(atual)) {
+      linhas.push(`<div><span style="color:var(--ink-mute)">${rot}:</span> <del>${atual.trim()}</del> → <b>${padronizarNome(atual)}</b></div>`);
+    }
+  }
+  $('ed-prev').innerHTML = linhas.join('');
+  $('ed-sugestao').classList.toggle('on', linhas.length > 0);
+}
+
+async function abrirEdicao(id) {
+  $('ed-erro').style.display = 'none';
+  $('ed-passo').textContent = 'Carregando…';
+  $('ed-back').classList.add('on');
+  try {
+    const e = await getEmpreendimento(id);
+    ed.id = e.id;
+    ed.cor = e.cor;
+    $('ed-passo').textContent = (PRESET_LABEL[e.preset] || e.preset || 'Empreendimento');
+    $('ed-slug').textContent = '?emp=' + e.slug;
+    $('e-nome').value     = e.nome || '';
+    $('e-endereco').value = e.endereco || '';
+    $('e-cidade').value   = e.cidade || '';
+    $('e-uf').value       = e.uf || '';
+    $('e-prop').value     = e.proprietaria || '';
+    pintarCores($('e-cores'), e.cor, c => { ed.cor = c; });
+    revisarPadronizacao();
+    $('e-nome').focus();
+  } catch (err) {
+    $('ed-passo').textContent = '—';
+    $('ed-erro').textContent = err.message;
+    $('ed-erro').style.display = '';
+  }
+}
+
+CAMPOS_TXT.forEach(([id]) => $(id).addEventListener('input', revisarPadronizacao));
+$('e-uf').addEventListener('blur', () => { $('e-uf').value = padronizarUF($('e-uf').value); });
+
+$('ed-aplicar').addEventListener('click', () => {
+  CAMPOS_TXT.forEach(([id]) => { $(id).value = padronizarNome($(id).value); });
+  revisarPadronizacao();
 });
 
-// 5.5 Mapa em tela cheia
-// IMPORTANTE: limpa o #grid original pra evitar IDs duplicados no DOM
-// (os SVGs e o #planta-handles existem dentro do grid; manter dois quebra getElementById)
-document.getElementById('btn-mapa-fullscreen').addEventListener('click', () => {
-  const fs = document.getElementById('mapa-fullscreen');
-  const gridOrig = document.getElementById('grid');
-  // Esvazia o grid original pra evitar #planta-handles duplicado no DOM
-  gridOrig.innerHTML = '';
-  import('./js/render.js').then(({ renderTudo }) => {
-    fs.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    setState('mapaFullscreenAtivo', true);
-    renderTudo();
-  });
-});
-document.getElementById('btn-mapa-fechar').addEventListener('click', async () => {
-  document.getElementById('mapa-fullscreen').style.display = 'none';
-  document.body.style.overflow = '';
-  setState('mapaFullscreenAtivo', false);
-  const { renderTudo } = await import('./js/render.js');
-  renderTudo();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && getState('mapaFullscreenAtivo')) {
-    document.getElementById('btn-mapa-fechar')?.click();
+$('ed-cancelar').addEventListener('click', () => $('ed-back').classList.remove('on'));
+$('ed-back').addEventListener('click', ev => { if (ev.target === $('ed-back')) $('ed-back').classList.remove('on'); });
+
+$('ed-salvar').addEventListener('click', async () => {
+  const btn = $('ed-salvar');
+  const nome = $('e-nome').value.trim();
+  if (!nome) {
+    $('ed-erro').textContent = 'O empreendimento precisa de um nome.';
+    $('ed-erro').style.display = ''; return;
+  }
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  $('ed-erro').style.display = 'none';
+  try {
+    await atualizarEmpreendimento(ed.id, {
+      nome,
+      endereco: $('e-endereco').value.trim(),
+      cidade:   $('e-cidade').value.trim(),
+      uf:       padronizarUF($('e-uf').value),
+      proprietaria: $('e-prop').value.trim(),
+      cor: ed.cor,
+    });
+    $('ed-back').classList.remove('on');
+    renderPortfolio(await listEmpreendimentos(true));   // force: refaz o cache do seletor
+  } catch (err) {
+    $('ed-erro').textContent = err.message;
+    $('ed-erro').style.display = '';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Salvar';
   }
 });
 
-// 6. Render inicial
-await renderTudo();
+// ---------------------------------------------------------------------
+// Wizard
+// ---------------------------------------------------------------------
+const wiz = { passo: 1, preset: null, cor: null };
 
-// 6.5 Inicializa chat widget flutuante
-initChatWidget();
-
-// 7. Service Worker (PWA)
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js').catch(err => console.warn('SW:', err));
+function abrirWizard() {
+  wiz.passo = 1; wiz.preset = null; wiz.cor = null;
+  $('wiz-presets').innerHTML = PRESETS.map(p => `
+    <div class="preset" data-k="${p.key}"><div class="ic">${p.ic}</div><h4>${p.nome}</h4><p>${p.desc}</p></div>`).join('');
+  $('wiz-presets').querySelectorAll('.preset').forEach(el => el.addEventListener('click', () => {
+    $('wiz-presets').querySelectorAll('.preset').forEach(x => x.classList.remove('sel'));
+    el.classList.add('sel');
+    wiz.preset = PRESETS.find(p => p.key === el.dataset.k);
+    $('wiz-avancar').disabled = false;
+  }));
+  $('w-cores').innerHTML = CORES.map(c => `<span class="cor" data-c="${c}" style="background:${c}"></span>`).join('');
+  $('w-cores').querySelectorAll('.cor').forEach(el => el.addEventListener('click', () => {
+    $('w-cores').querySelectorAll('.cor').forEach(x => x.classList.remove('sel'));
+    el.classList.add('sel'); wiz.cor = el.dataset.c;
+  }));
+  mostrarPasso(1);
+  $('wiz-back').classList.add('on');
 }
+
+function mostrarPasso(n) {
+  wiz.passo = n;
+  const nomes = { 1: 'Tipologia', 2: 'Identificação', 3: 'Unidades' };
+  $('wiz-passo').textContent = `Passo ${n} de 3 · ${nomes[n]}`;
+  $('wiz-p1').style.display = n === 1 ? '' : 'none';
+  $('wiz-p2').style.display = n === 2 ? '' : 'none';
+  $('wiz-p3').style.display = n === 3 ? '' : 'none';
+  $('wiz-voltar').style.display = n > 1 ? '' : 'none';
+  $('wiz-avancar').textContent = n === 3 ? 'Criar empreendimento' : 'Avançar →';
+  $('wiz-avancar').disabled = (n === 1 && !wiz.preset);
+  $('wiz-erro').style.display = 'none';
+  $('wiz-obs').textContent = n === 3 && wiz.preset?.qtdFixa
+    ? 'Unidade avulsa: cria 1 unidade — os detalhes você preenche na ficha.'
+    : (n === 2 ? 'A cor identifica o empreendimento no portfólio e no cabeçalho do app.' : '');
+  if (n === 3 && wiz.preset?.qtdFixa) { $('w-qtd').value = 1; $('w-qtd').disabled = true; }
+  else if (n === 3) { $('w-qtd').disabled = false; }
+  if (n === 2 && !wiz.cor) {
+    const el = $('w-cores').querySelector(`[data-c="${wiz.preset.cor}"]`);
+    if (el) { el.classList.add('sel'); wiz.cor = wiz.preset.cor; }
+  }
+}
+
+function slugify(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
+async function criarEmpreendimento() {
+  // Padroniza já na entrada: assim ninguém precisa lembrar da regra de caixa,
+  // e o cadastro nasce do jeito que vai sair no contrato e no PDF.
+  const nome = padronizarNome($('w-nome').value.trim());
+  if (!nome) throw new Error('Dê um nome ao empreendimento (passo 2).');
+  const qtd = wiz.preset.qtdFixa || Math.max(1, Math.min(500, parseInt($('w-qtd').value, 10) || 1));
+  const cod1 = ($('w-cod1').value.trim() || '01');
+  const area = parseFloat($('w-area').value) || null;
+
+  const supa = await getSupabase();
+  const emps = await listEmpreendimentos();
+  let slug = slugify(nome);
+  if (emps.some(e => e.slug === slug)) slug = slug + '-' + Date.now().toString(36).slice(-4);
+
+  // 1. Empreendimento
+  const { data: emp, error: e1 } = await supa.from('empreendimentos').insert({
+    nome, slug, preset: wiz.preset.key, finalidade: wiz.preset.finalidade,
+    cor: wiz.cor || wiz.preset.cor,
+    endereco: padronizarNome($('w-endereco').value.trim()) || null,
+    cidade: padronizarNome($('w-cidade').value.trim()) || null,
+    uf: padronizarUF($('w-uf').value) || null,
+    proprietaria: $('w-prop').value.trim() || null,
+    ordem: emps.length + 1,
+    config: wiz.preset.config
+  }).select().single();
+  if (e1) throw new Error('Erro ao criar empreendimento: ' + e1.message);
+
+  // 2. Vínculo do criador como proprietário
+  const { error: e2 } = await supa.from('usuario_empreendimento')
+    .insert({ user_id: _user.id || _user.user_id, empreendimento_id: emp.id, papel: 'proprietario' });
+  if (e2 && !String(e2.message).includes('duplicate')) console.warn('vinculo:', e2.message);
+
+  // 3. Unidades em sequência a partir do primeiro código
+  const pad = cod1.length;
+  const inicio = parseInt(cod1.replace(/\D/g, ''), 10) || 1;
+  const prefixo = cod1.replace(/\d+$/, '');
+  const unidades = Array.from({ length: qtd }, (_, i) => ({
+    codigo: prefixo + String(inicio + i).padStart(Math.max(1, pad - prefixo.length), '0'),
+    area_privativa: area, area_total: area,
+    uso_interno: false,
+    tipo: wiz.preset.tipo, finalidade: wiz.preset.finalidade,
+    empreendimento_id: emp.id
+  }));
+  const { error: e3 } = await supa.from('lojas').insert(unidades);
+  if (e3) throw new Error('Empreendimento criado, mas houve erro ao gerar as unidades: ' + e3.message);
+
+  return emp;
+}
+
+$('wiz-cancelar').addEventListener('click', () => $('wiz-back').classList.remove('on'));
+$('wiz-voltar').addEventListener('click', () => mostrarPasso(wiz.passo - 1));
+$('wiz-avancar').addEventListener('click', async () => {
+  if (wiz.passo < 3) {
+    if (wiz.passo === 2 && !$('w-nome').value.trim()) {
+      $('wiz-erro').textContent = 'Dê um nome ao empreendimento.'; $('wiz-erro').style.display = ''; return;
+    }
+    mostrarPasso(wiz.passo + 1); return;
+  }
+  const btn = $('wiz-avancar');
+  btn.disabled = true; btn.textContent = 'Criando…';
+  try {
+    await criarEmpreendimento();
+    $('wiz-back').classList.remove('on');
+    const emps = await listEmpreendimentos(true);
+    renderPortfolio(emps);
+  } catch (err) {
+    $('wiz-erro').textContent = err.message; $('wiz-erro').style.display = '';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Criar empreendimento';
+  }
+});
+
+boot().catch(err => {
+  console.error(err);
+  document.getElementById('cards').innerHTML = `<div class="loading">Erro ao carregar: ${err.message}</div>`;
+});
 </script>
 </body>
 </html>

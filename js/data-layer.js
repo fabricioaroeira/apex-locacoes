@@ -29,6 +29,29 @@ function empEq(q) {
   const id = getCtxId();
   return id ? q.eq('empreendimento_id', id) : q;
 }
+// Escopo por CONTRATO. As tabelas filhas — parcelas SIENGE, cobranças — não têm
+// empreendimento_id: o vínculo vem do contrato. Sem escopo, uma tela do LÉT
+// lista parcelas do Union (foi o vazamento visto em 25/08/2026).
+//
+// Feito em DOIS PASSOS de propósito, em vez do join embutido
+// `contratos!inner(...)`: aquele caminho depende do PostgREST reconhecer a
+// chave estrangeira, e se ela não estiver declarada a consulta não vaza — ela
+// QUEBRA, derrubando a aba inteira. Duas idas ao banco custam menos que isso.
+//
+// Devolve null quando não há contexto (portfólio): aí não se filtra.
+async function idsContratosDoContexto(supa) {
+  const id = getCtxId();
+  if (!id) return null;
+  const { data, error } = await supa.from('contratos').select('id').eq('empreendimento_id', id);
+  if (error) throw new Error('Erro ao delimitar o empreendimento: ' + error.message);
+  return (data || []).map(c => c.id);
+}
+
+// Aplica o recorte a uma consulta que tenha coluna contrato_id.
+function porContratos(q, ids) {
+  return ids ? q.in('contrato_id', ids) : q;
+}
+
 function empStamp(payload) {
   const id = getCtxId();
   if (id && !payload.empreendimento_id) payload.empreendimento_id = id;
@@ -233,7 +256,10 @@ export async function getKPIs() {
 export async function getInquilinos() {
   if (MOCK_MODE) return loadStore().inquilinos;
   const supa = await getSupabase();
-  const { data } = await supa.from('inquilinos').select('*').order('razao_social');
+  // O cadastro de inquilinos é POR EMPREENDIMENTO: sócios de um imóvel não
+  // podem ver a carteira de clientes dos outros. O RLS já barra, mas o filtro
+  // aqui evita depender só dele e mantém o seletor do formulário coerente.
+  const { data } = await empEq(supa.from('inquilinos').select('*')).order('razao_social');
   return data;
 }
 
@@ -262,7 +288,7 @@ export async function saveInquilino(input) {
       const { data } = await supa.from('inquilinos').update(input).eq('id', input.id).select().single();
       return data;
     } else {
-      const { data } = await supa.from('inquilinos').insert(input).select().single();
+      const { data } = await supa.from('inquilinos').insert(empStamp({ ...input })).select().single();
       return data;
     }
   }
@@ -729,8 +755,24 @@ export async function atualizarStatusAtrasadas() {
   if (MOCK_MODE) return;
   const supa = await getSupabase();
   const hoje = new Date().toISOString().slice(0, 10);
-  await supa.from('cobrancas').update({ status: 'atrasada' })
-    .eq('status', 'pendente').lt('vencimento', hoje);
+
+  // UPDATE não aceita filtro por join embutido no PostgREST, então o escopo
+  // vem em dois passos: descobre os ids do empreendimento em contexto e só
+  // então atualiza. Antes, abrir a tela de um imóvel remarcava as cobranças
+  // atrasadas de TODOS os outros.
+  const idsCtx = await idsContratosDoContexto(supa);
+  if (idsCtx && !idsCtx.length) return;
+  const { data: alvos, error: e1 } = await porContratos(supa.from('cobrancas')
+    .select('id')
+    .eq('status', 'pendente')
+    .lt('vencimento', hoje), idsCtx);
+  if (e1) throw new Error('Erro ao localizar cobranças atrasadas: ' + e1.message);
+  if (!alvos || !alvos.length) return;
+
+  const { error: e2 } = await supa.from('cobrancas')
+    .update({ status: 'atrasada' })
+    .in('id', alvos.map(c => c.id));
+  if (e2) throw new Error('Erro ao atualizar cobranças: ' + e2.message);
 }
 
 // ---------------------------------------------------------------------
@@ -740,7 +782,7 @@ export async function getFornecedores(filtros) {
   if (MOCK_MODE) return [];
   const ativo = filtros && filtros.ativo !== undefined ? filtros.ativo : true;
   const supa = await getSupabase();
-  let q = supa.from('fornecedores').select('*');
+  let q = empEq(supa.from('fornecedores').select('*'));
   if (ativo !== null) q = q.eq('ativo', ativo);
   const { data, error } = await q.order('nome');
   if (error) throw new Error('Erro ao buscar fornecedores: ' + error.message);
@@ -757,7 +799,7 @@ export async function saveFornecedor(input) {
     if (error) throw new Error('Erro ao atualizar fornecedor: ' + error.message);
     return data;
   }
-  const { data, error } = await supa.from('fornecedores').insert(payload).select().single();
+  const { data, error } = await supa.from('fornecedores').insert(empStamp(payload)).select().single();
   if (error) throw new Error('Erro ao criar fornecedor: ' + error.message);
   return data;
 }
@@ -1600,9 +1642,11 @@ export async function getInadimplenciaSienge() {
   const supa = await getSupabase();
   // Atualiza status primeiro (a_vencer → atrasada conforme data atual). Ignora erro se RPC não existir.
   try { await supa.rpc('fn_recalcular_status_sienge'); } catch (_) {}
-  const { data: parcs } = await supa.from('sienge_parcelas')
+  const idsCtx = await idsContratosDoContexto(supa);
+  if (idsCtx && !idsCtx.length) return [];        // empreendimento sem contratos
+  const { data: parcs } = await porContratos(supa.from('sienge_parcelas')
     .select('*')
-    .eq('status', 'atrasada')
+    .eq('status', 'atrasada'), idsCtx)
     .order('data_vencimento');
   if (!parcs || parcs.length === 0) return [];
 
@@ -1636,10 +1680,12 @@ export async function getCobrancasSiengeDoMes(yyyymm) {
   const ultimoDia = new Date(y, m, 0).getDate();
   const fim = `${mes}-${String(ultimoDia).padStart(2,'0')}`;
 
-  const { data: parcs } = await supa.from('sienge_parcelas')
+  const idsCtx = await idsContratosDoContexto(supa);
+  if (idsCtx && !idsCtx.length) return [];
+  const { data: parcs } = await porContratos(supa.from('sienge_parcelas')
     .select('*')
     .gte('data_vencimento', inicio)
-    .lte('data_vencimento', fim)
+    .lte('data_vencimento', fim), idsCtx)
     .order('data_vencimento');
   if (!parcs || parcs.length === 0) return [];
 
@@ -1655,6 +1701,7 @@ export async function getCobrancasSiengeDoMes(yyyymm) {
 export async function getDREMensalSienge(meses = 6) {
   if (MOCK_MODE) return [];
   const supa = await getSupabase();
+  const idsCtxDRE = await idsContratosDoContexto(supa);   // uma vez, fora do laço
   const hoje = new Date();
   const linhas = [];
   for (let i = 0; i < meses; i++) {
@@ -1665,14 +1712,18 @@ export async function getDREMensalSienge(meses = 6) {
     const ultimoDia = new Date(y, m, 0).getDate();
     const fim = `${yyyymm}-${String(ultimoDia).padStart(2,'0')}`;
 
-    const { data: pagas } = await supa.from('sienge_parcelas')
-      .select('valor_pago')
-      .eq('status', 'paga')
-      .gte('data_pagamento', inicio)
-      .lte('data_pagamento', fim);
+    let pagas = [];
+    if (!idsCtxDRE || idsCtxDRE.length) {
+      ({ data: pagas } = await porContratos(supa.from('sienge_parcelas')
+        .select('valor_pago')
+        .eq('status', 'paga')
+        .gte('data_pagamento', inicio)
+        .lte('data_pagamento', fim), idsCtxDRE));
+    }
     const receita = (pagas || []).reduce((s, p) => s + Number(p.valor_pago || 0), 0);
 
-    const { data: desp } = await supa.from('despesas').select('valor_pago, valor').eq('status', 'paga')
+    // despesas TEM empreendimento_id próprio (empStamp na gravação)
+    const { data: desp } = await empEq(supa.from('despesas').select('valor_pago, valor')).eq('status', 'paga')
       .gte('data_pagamento', inicio).lte('data_pagamento', fim);
     const despesa = (desp || []).reduce((s, d) => s + Number(d.valor_pago || d.valor || 0), 0);
 
@@ -1838,4 +1889,35 @@ export async function atualizarEmpreendimento(id, patch) {
     .update(dados).eq('id', id).select().single();
   if (error) throw new Error('Erro ao salvar: ' + error.message);
   return data;
+}
+
+// =====================================================================
+// Alertas do PORTFÓLIO inteiro (página de entrada)
+// =====================================================================
+// Sem empEq de propósito: esta é a única leitura que atravessa os
+// empreendimentos. Quem enxerga o quê continua sendo decidido pelo RLS
+// da v_alertas — a lista já chega restrita aos imóveis da pessoa.
+//
+// Ordena por urgência e, dentro dela, pelo que vence antes.
+export async function getAlertasPortfolio() {
+  const supa = await getSupabase();
+  const { data, error } = await supa.from('v_alertas')
+    .select('alerta_hash, tipo, urgencia, titulo, descricao, entidade_tipo, entidade_id, data_evento, dias_para_evento, status, adiado_ate, empreendimento_id')
+    .neq('status', 'resolvido');
+  if (error) throw new Error('Erro ao carregar alertas: ' + error.message);
+
+  // Adiado para uma data futura não é pendência de hoje.
+  const hoje = new Date().toISOString().slice(0, 10);
+  const abertos = (data || []).filter(a => !a.adiado_ate || a.adiado_ate <= hoje);
+
+  const peso = { critico: 0, alto: 1, medio: 2, baixo: 3 };
+  abertos.sort((a, b) =>
+    (peso[a.urgencia] ?? 9) - (peso[b.urgencia] ?? 9) ||
+    (a.dias_para_evento ?? 99999) - (b.dias_para_evento ?? 99999));
+
+  return {
+    itens: abertos,
+    total: abertos.length,
+    criticos: abertos.filter(a => a.urgencia === 'critico').length,
+  };
 }

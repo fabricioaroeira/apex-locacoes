@@ -680,8 +680,12 @@ async function renderAlertas(propostas, contratos, gestoes = []) {
     list.appendChild(div);
   });
 
-  // Alertas fixos
-  const fixos = [
+  // Alertas fixos — ATENÇÃO: são anotações do Union 511 escritas no código
+  // (nomes de inquilinos, números de loja, cláusulas). Antes apareciam em
+  // TODO empreendimento, vazando informação do Union para as telas do LÉT e
+  // dos Galpões. Ficam restritas ao Union até virarem registros de verdade.
+  const _emp = getCtxEmp();
+  const fixos = (_emp?.slug !== 'union-511') ? [] : [
     { tipo:'red',    titulo:'⚠ Verificar vagas comuns no contrato Evolve / Academia Noroeste',
       body:'Há suspeita de que vagas designadas como uso comum na Convenção de Condomínio possam ter sido incluídas no rol de 54 vagas locadas. Conferir matrícula a matrícula.' },
     { tipo:'',       titulo:'ℹ Lojas 02, 03, 49 e 52 — uso interno JAX 28',
