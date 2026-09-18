@@ -18,6 +18,9 @@
 import { MOCK_MODE, getSupabase, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase-client.js';
 import { parseBR, addMonths, fmtBR } from './utils.js';
 import { getCtxId } from './contexto.js';
+// Import estático de propósito: com import() dinâmico o navegador servia a versão
+// antiga do cache por 10 min mesmo após Ctrl+F5 (GitHub Pages, max-age=600).
+import { lerPdfNoNavegador, parseRelatorioSienge, consolidarParcelas } from './sienge-relatorio.js';
 
 // ---------------------------------------------------------------------
 // ESCOPO DE EMPREENDIMENTO (Etapa B)
@@ -1947,7 +1950,6 @@ export async function analisarSiengeConsolidado(arquivos) {
   if (!lista.length) throw new Error('Escolha o PDF de Contas Recebidas e/ou de Contas a Receber.');
   if (lista.length > 2) throw new Error('No máximo dois PDFs: Contas Recebidas e Contas a Receber.');
 
-  const { lerPdfNoNavegador, parseRelatorioSienge, consolidarParcelas } = await import('./sienge-relatorio.js');
 
   // 1) Lê e classifica os PDFs
   const rel = { recebidas: null, aReceber: null };
