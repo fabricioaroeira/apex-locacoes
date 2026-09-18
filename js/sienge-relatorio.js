@@ -11,7 +11,7 @@
 //
 // Este módulo é puro (sem DOM, sem Supabase) para poder ser testado em
 // node com os mesmos PDFs. A única função que toca o navegador é
-// lerPdfNoNavegador(), que carrega o pdf.js do CDN sob demanda.
+// lerPdfNoNavegador(), que carrega o pdf.js embarcado (js/vendor) sob demanda.
 // =====================================================================
 
 const RE_DATA = /^\d{2}\/\d{2}\/\d{4}$/;
@@ -239,11 +239,12 @@ export function consolidarParcelas({ recebidas, aReceber }, hoje) {
 function round2(n) { return Math.round(n * 100) / 100; }
 
 // ---------------------------------------------------------------------
-// 6. Navegador: extrai as linhas de um File PDF com pdf.js (CDN, sob demanda)
+// 6. Navegador: extrai as linhas de um File PDF com pdf.js (embarcado, sob demanda)
 // ---------------------------------------------------------------------
-const PDFJS_VER = '3.11.174';
-const PDFJS_URL = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VER}/pdf.min.js`;
-const PDFJS_WORKER = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VER}/pdf.worker.min.js`;
+// pdf.js 3.11.174 embarcado em js/vendor/: a CSP das páginas só permite
+// script do próprio domínio (e o worker nem do jsdelivr), então CDN não serve.
+const PDFJS_URL = new URL('./vendor/pdf.min.js', import.meta.url).href;
+const PDFJS_WORKER = new URL('./vendor/pdf.worker.min.js', import.meta.url).href;
 let _pdfjs = null;
 async function carregarPdfJs() {
   if (_pdfjs) return _pdfjs;
@@ -251,7 +252,7 @@ async function carregarPdfJs() {
   if (!window.pdfjsLib) {
     await new Promise((ok, erro) => {
       const s = document.createElement('script');
-      s.src = PDFJS_URL; s.onload = ok; s.onerror = () => erro(new Error('Não foi possível carregar o leitor de PDF (pdf.js). Verifique a conexão.'));
+      s.src = PDFJS_URL; s.onload = ok; s.onerror = () => erro(new Error('Não foi possível carregar o leitor de PDF (js/vendor/pdf.min.js). Rode o PUSH_UPDATE.bat para publicar os arquivos novos.'));
       document.head.appendChild(s);
     });
   }
