@@ -53,7 +53,9 @@ export function dataISO(s) {
 }
 function parc(s) {
   const m = /^(\d+)\/(\d+)(\*?)$/.exec(s || '');
-  return m ? { num: Number(m[1]), total: Number(m[2]), rotulo: s } : { num: null, total: null, rotulo: s || null };
+  // chaves com prefixo: a linha do "a receber" também tem uma coluna "Total" (em R$),
+  // e um nome curto colidia com ela (parcela_total recebia dinheiro).
+  return m ? { parcela_num: Number(m[1]), parcela_total: Number(m[2]), parcela_rotulo: s } : { parcela_num: null, parcela_total: null, parcela_rotulo: s || null };
 }
 export function componenteDoDocumento(doc) {
   const p = String(doc || '').toUpperCase();
@@ -180,13 +182,13 @@ export function parseRelatorioSienge(paginas) {
 export function consolidarParcelas({ recebidas, aReceber }, hoje) {
   const hojeISO = hoje || new Date().toISOString().slice(0, 10);
   const mapa = new Map();
-  const chave = r => [r.documento, r.num ?? 'NULL', r.data_vencimento].join('|');
+  const chave = r => [r.documento, r.parcela_num ?? 'NULL', r.data_vencimento].join('|');
 
   for (const r of (recebidas?.registros || [])) {
     const k = chave(r);
     let p = mapa.get(k);
     if (!p) {
-      p = { chave: k, documento: r.documento, titulo: r.titulo, parcela_num: r.num, parcela_total: r.total, parcela_rotulo: r.rotulo,
+      p = { chave: k, documento: r.documento, titulo: r.titulo, parcela_num: r.parcela_num, parcela_total: r.parcela_total, parcela_rotulo: r.parcela_rotulo,
             unidade: r.unidade, loja: codigoLoja(r.unidade), cliente: r.cliente, componente: componenteDoDocumento(r.documento),
             data_vencimento: r.data_vencimento, valor_original: 0, valor_pago: 0, acrescimo: 0, desconto: 0,
             data_pagamento: null, baixas: 0, em_aberto: null };
@@ -203,7 +205,7 @@ export function consolidarParcelas({ recebidas, aReceber }, hoje) {
     const k = chave(r);
     let p = mapa.get(k);
     if (!p) {
-      p = { chave: k, documento: r.documento, titulo: r.titulo, parcela_num: r.num, parcela_total: r.total, parcela_rotulo: r.rotulo,
+      p = { chave: k, documento: r.documento, titulo: r.titulo, parcela_num: r.parcela_num, parcela_total: r.parcela_total, parcela_rotulo: r.parcela_rotulo,
             unidade: r.unidade, loja: codigoLoja(r.unidade), cliente: r.cliente, componente: componenteDoDocumento(r.documento),
             data_vencimento: r.data_vencimento, valor_original: r.valor_original, valor_pago: 0, acrescimo: 0, desconto: 0,
             data_pagamento: null, baixas: 0, em_aberto: null };
