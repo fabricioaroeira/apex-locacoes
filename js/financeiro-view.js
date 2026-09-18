@@ -54,7 +54,7 @@ async function renderCobrancas(box) {
   if (parcelas.length === 0) {
     box.innerHTML = `
       <div style="padding:30px;text-align:center;color:var(--ink-soft);background:#f8fafc;border-radius:8px;border:1px dashed var(--line)">
-        Nenhuma parcela SIENGE em <strong>${_mesAtual}</strong>. Importe o "Saldo Devedor Presente" dos contratos na aba <strong>💰 SIENGE</strong> da ficha pra ver as cobranças aqui.
+        Nenhuma parcela SIENGE em <strong>${_mesAtual}</strong>. Use <strong>📥 Importar SIENGE (todas as lojas)</strong> acima com os relatórios Contas Recebidas / Contas a Receber, ou importe contrato a contrato pela ficha.
       </div>`;
     return;
   }
@@ -96,7 +96,7 @@ async function renderCobrancas(box) {
       </tbody>
     </table>
     <div style="margin-top:14px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;color:#1e40af">
-      💡 Fonte: SIENGE (Saldo Devedor Presente). Pra atualizar status de pagamentos, reimporte o PDF do contrato pela ficha → aba <strong>💰 SIENGE</strong>.
+      💡 Fonte: SIENGE. Pra atualizar pagamentos de todas as lojas de uma vez, use <strong>📥 Importar SIENGE (todas as lojas)</strong>; um contrato só, pela ficha → aba <strong>💰 SIENGE</strong>.
     </div>
   `;
 }

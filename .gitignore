@@ -7,3 +7,5 @@ sql/
 vercel.json
 PUSH_GITHUB.bat
 PUSH_UPDATE.bat
+_to_delete/
+CONSERTAR_GIT.bat

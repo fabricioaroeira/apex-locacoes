@@ -1684,6 +1684,7 @@ export async function getCobrancasSiengeDoMes(yyyymm) {
   if (idsCtx && !idsCtx.length) return [];
   const { data: parcs } = await porContratos(supa.from('sienge_parcelas')
     .select('*')
+    .neq('status', 'cancelada')
     .gte('data_vencimento', inicio)
     .lte('data_vencimento', fim), idsCtx)
     .order('data_vencimento');
@@ -1920,4 +1921,207 @@ export async function getAlertasPortfolio() {
     total: abertos.length,
     criticos: abertos.filter(a => a.urgencia === 'critico').length,
   };
+}
+
+// =====================================================================
+// Importação CONSOLIDADA do SIENGE (todas as lojas de uma vez)
+// =====================================================================
+// Entrada: os relatórios "Contas Recebidas (por Cliente)" e "Contas a
+// Receber (por Cliente)" exportados SEM filtro de cliente. A leitura é
+// determinística (js/sienge-relatorio.js), sem IA. Cada linha traz a
+// unidade principal ("Loja 14"); é por ela que a parcela chega ao contrato
+// ativo daquela loja, sempre dentro do empreendimento em contexto.
+//
+// Dois passos, para o usuário ver antes de gravar:
+//   analisarSiengeConsolidado(files)  -> prévia (não escreve nada)
+//   gravarSiengeConsolidado(previa)   -> upsert + cancelamento das órfãs
+// =====================================================================
+
+const SIENGE_STATUS_ABERTO = ['a_vencer', 'atrasada'];
+
+export async function analisarSiengeConsolidado(arquivos) {
+  if (MOCK_MODE) throw new Error('Importação SIENGE não disponível em MOCK_MODE');
+  const ctx = getCtxId();
+  if (!ctx) throw new Error('Abra um empreendimento antes de importar — a importação é por empreendimento.');
+  const lista = Array.from(arquivos || []).filter(Boolean);
+  if (!lista.length) throw new Error('Escolha o PDF de Contas Recebidas e/ou de Contas a Receber.');
+  if (lista.length > 2) throw new Error('No máximo dois PDFs: Contas Recebidas e Contas a Receber.');
+
+  const { lerPdfNoNavegador, parseRelatorioSienge, consolidarParcelas } = await import('./sienge-relatorio.js');
+
+  // 1) Lê e classifica os PDFs
+  const rel = { recebidas: null, aReceber: null };
+  for (const f of lista) {
+    if (f.type !== 'application/pdf') throw new Error(`"${f.name}" não é PDF.`);
+    const paginas = await lerPdfNoNavegador(f);
+    const r = parseRelatorioSienge(paginas);
+    r.arquivo = f.name;
+    const slot = r.meta.tipo === 'recebidas' ? 'recebidas' : 'aReceber';
+    if (rel[slot]) throw new Error(`Dois relatórios do mesmo tipo (${r.meta.tipo}). Envie um de cada.`);
+    rel[slot] = r;
+  }
+
+  const supa = await getSupabase();
+  const avisos = [];
+
+  // 2) Confere o centro de custo com o empreendimento (evita gravar o Union dentro do QS 406)
+  const { data: emp } = await supa.from('empreendimentos').select('id, nome, config').eq('id', ctx).single();
+  const cabecalhos = [rel.recebidas, rel.aReceber].filter(Boolean).map(r => r.meta.centro_custo).filter(Boolean);
+  const ccEsperado = emp?.config?.sienge_centro_custo || null;
+  const ccLido = cabecalhos[0] ? `${cabecalhos[0].codigo} - ${cabecalhos[0].nome}` : null;
+  if (cabecalhos.length === 2 && cabecalhos[0].codigo !== cabecalhos[1].codigo) {
+    throw new Error(`Os dois PDFs são de centros de custo diferentes (${cabecalhos[0].nome} × ${cabecalhos[1].nome}).`);
+  }
+  if (ccEsperado && ccLido && !ccLido.startsWith(String(ccEsperado.codigo || ccEsperado))) {
+    throw new Error(`Este relatório é do centro de custo "${ccLido}", mas o empreendimento ${emp.nome} está vinculado a "${ccEsperado.codigo || ccEsperado}". Importação bloqueada.`);
+  }
+  if (!ccEsperado && ccLido) {
+    avisos.push(`Relatório do centro de custo "${ccLido}". Ao gravar, ele fica vinculado ao empreendimento ${emp?.nome} e importações de outro centro passam a ser recusadas.`);
+  }
+
+  // 3) Loja -> contrato ativo (dentro do contexto)
+  const { data: lojas } = await supa.from('lojas').select('id, codigo').eq('empreendimento_id', ctx);
+  const lojaIdPorCodigo = new Map((lojas || []).map(l => [String(l.codigo).padStart(2, '0'), l.id]));
+  const { data: ctrsAtivos } = await supa.from('contratos').select('id').eq('empreendimento_id', ctx).eq('status', 'ativo');
+  const idsAtivos = new Set((ctrsAtivos || []).map(c => c.id));
+  const { data: vinc } = idsAtivos.size
+    ? await supa.from('contrato_lojas').select('contrato_id, loja_id').in('contrato_id', [...idsAtivos])
+    : { data: [] };
+  const contratoPorLojaId = new Map((vinc || []).map(v => [v.loja_id, v.contrato_id]));
+  const codigosPorContrato = new Map();
+  const codigoPorLojaId = new Map((lojas || []).map(l => [l.id, String(l.codigo).padStart(2, '0')]));
+  for (const v of (vinc || [])) {
+    if (!codigosPorContrato.has(v.contrato_id)) codigosPorContrato.set(v.contrato_id, []);
+    codigosPorContrato.get(v.contrato_id).push(codigoPorLojaId.get(v.loja_id));
+  }
+  const { data: nomes } = idsAtivos.size
+    ? await supa.from('v_contratos_completo').select('id, nome_fantasia, razao_social').in('id', [...idsAtivos])
+    : { data: [] };
+  const nomePorContrato = new Map((nomes || []).map(c => [c.id, c.nome_fantasia || c.razao_social || '?']));
+
+  // 4) Consolida e casa
+  const hoje = new Date().toISOString().slice(0, 10);
+  const parcelas = consolidarParcelas(rel, hoje);
+  const payload = [], naoCasadas = [];
+  for (const p of parcelas) {
+    const lojaId = p.loja ? lojaIdPorCodigo.get(p.loja) : null;
+    const contratoId = lojaId ? contratoPorLojaId.get(lojaId) : null;
+    if (!contratoId) {
+      naoCasadas.push({ ...p, motivo: !p.loja ? `unidade "${p.unidade}" não é uma loja` : !lojaId ? `loja ${p.loja} não existe neste empreendimento` : `loja ${p.loja} sem contrato ativo` });
+      continue;
+    }
+    payload.push({
+      contrato_id: contratoId,
+      sienge_titulo: p.sienge_titulo,
+      sienge_titulo_id: p.titulo || null,
+      sienge_codigo: p.documento,
+      componente: p.componente,
+      parcela_num: p.parcela_num,
+      parcela_total: p.parcela_total,
+      parcela_rotulo: p.parcela_rotulo,
+      data_vencimento: p.data_vencimento,
+      valor_original: p.valor_original,
+      valor_corrigido: p.valor_corrigido,
+      indexador: 'REAL',
+      data_pagamento: p.data_pagamento,
+      valor_pago: p.valor_pago,
+      recto_liquido: p.status === 'paga' ? p.valor_pago : null,
+      status: p.status,
+      observacoes: p.baixas > 1 ? `${p.baixas} baixas parciais somadas` : (p.em_aberto && p.baixas ? `recebido ${p.valor_pago} · saldo ${p.em_aberto.saldo}` : null),
+      _loja: p.loja, _cliente: p.cliente,
+    });
+  }
+
+  // 5) Compara com o que já existe (novas / atualizadas / órfãs)
+  const idsAfetados = [...new Set(payload.map(x => x.contrato_id))];
+  const { data: existentes } = idsAfetados.length
+    ? await supa.from('sienge_parcelas').select('id, contrato_id, sienge_codigo, parcela_num, data_vencimento, status, valor_corrigido, valor_pago, data_pagamento').in('contrato_id', idsAfetados)
+    : { data: [] };
+  const chave = x => [x.contrato_id, x.sienge_codigo, x.parcela_num ?? 'NULL', x.data_vencimento].join('|');
+  const exist = new Map((existentes || []).map(e => [chave(e), e]));
+  const novas = new Set(); let novasN = 0, atualizadasN = 0, iguaisN = 0;
+  for (const x of payload) {
+    const e = exist.get(chave(x));
+    if (!e) { novasN++; novas.add(chave(x)); continue; }
+    const mudou = e.status !== x.status || Number(e.valor_corrigido) !== x.valor_corrigido || Number(e.valor_pago || 0) !== Number(x.valor_pago || 0) || (e.data_pagamento || null) !== (x.data_pagamento || null);
+    if (mudou) atualizadasN++; else iguaisN++;
+  }
+  // Órfã = existe no banco, era esperada no relatório correspondente (pelo período) e não veio.
+  const noPayload = new Set(payload.map(chave));
+  const perRec = rel.recebidas?.meta.periodo, perArc = rel.aReceber?.meta.periodo;
+  // Só títulos que o relatório conhece entram na conta: um título de
+  // condomínio (COND.UNI…) de outro centro de custo não vem no relatório
+  // das lojas e NÃO pode virar órfão por isso.
+  const docsNoRelatorio = new Set(payload.map(x => x.sienge_codigo));
+  const orfas = [];
+  for (const e of (existentes || [])) {
+    if (noPayload.has(chave(e)) || e.status === 'cancelada') continue;
+    if (!docsNoRelatorio.has(e.sienge_codigo)) continue;
+    let esperada = false;
+    if (e.status === 'paga' && perRec && e.data_pagamento && e.data_pagamento >= perRec.de && e.data_pagamento <= perRec.ate) esperada = true;
+    if (SIENGE_STATUS_ABERTO.includes(e.status) && perArc && e.data_vencimento >= perArc.de && e.data_vencimento <= perArc.ate) esperada = true;
+    if (esperada) orfas.push({ ...e, contrato_nome: nomePorContrato.get(e.contrato_id) || '?' });
+  }
+  if (perArc) {
+    const vencidasFora = (existentes || []).filter(e => SIENGE_STATUS_ABERTO.includes(e.status) && e.data_vencimento < perArc.de).length;
+    if (perArc.de >= hoje || vencidasFora) avisos.push(`O relatório "a receber" começa em ${perArc.de.split('-').reverse().join('/')}: parcelas vencidas antes disso não estão nele${vencidasFora ? ` (há ${vencidasFora} no sistema, que ficam como estão)` : ''}. Para incluir atrasadas, exporte com período inicial 01/01/2000.`);
+  }
+  if (!rel.recebidas) avisos.push('Sem o relatório de Contas Recebidas: pagamentos não serão atualizados, só o cronograma a receber.');
+  if (!rel.aReceber) avisos.push('Sem o relatório de Contas a Receber: só os pagamentos serão atualizados.');
+
+  // 6) Resumo por contrato para a prévia
+  const porContrato = idsAfetados.map(id => {
+    const xs = payload.filter(x => x.contrato_id === id);
+    return {
+      contrato_id: id, nome: nomePorContrato.get(id) || '?', lojas: (codigosPorContrato.get(id) || []).sort().join(', '),
+      pagas: xs.filter(x => x.status === 'paga').length,
+      a_vencer: xs.filter(x => x.status === 'a_vencer').length,
+      atrasadas: xs.filter(x => x.status === 'atrasada').length,
+      total_pago: xs.filter(x => x.status === 'paga').reduce((s, x) => s + Number(x.valor_pago || 0), 0),
+      total_aberto: xs.filter(x => x.status !== 'paga').reduce((s, x) => s + Number(x.valor_corrigido || 0), 0),
+      novas: xs.filter(x => novas.has(chave(x))).length,
+      orfas: orfas.filter(o => o.contrato_id === id).length,
+    };
+  }).sort((a, b) => a.nome.localeCompare(b.nome));
+
+  return {
+    empreendimento: { id: ctx, nome: emp?.nome },
+    centro_custo: cabecalhos[0] || null, vincular_centro_custo: !ccEsperado && !!cabecalhos[0],
+    relatorios: {
+      recebidas: rel.recebidas ? { arquivo: rel.recebidas.arquivo, periodo: rel.recebidas.meta.periodo, emitido_em: rel.recebidas.meta.emitido_em, linhas: rel.recebidas.registros.length } : null,
+      a_receber: rel.aReceber ? { arquivo: rel.aReceber.arquivo, periodo: rel.aReceber.meta.periodo, emitido_em: rel.aReceber.meta.emitido_em, linhas: rel.aReceber.registros.length } : null,
+    },
+    totais: { parcelas: payload.length, novas: novasN, atualizadas: atualizadasN, iguais: iguaisN, nao_casadas: naoCasadas.length, orfas: orfas.length, contratos: idsAfetados.length },
+    porContrato, naoCasadas, orfas, avisos,
+    payload,                                   // o que será gravado
+    orfasIds: orfas.map(o => o.id),            // o que será cancelado
+  };
+}
+
+export async function gravarSiengeConsolidado(previa) {
+  if (!previa?.payload?.length) throw new Error('Nada para gravar.');
+  const supa = await getSupabase();
+  const limpo = previa.payload.map(({ _loja, _cliente, ...x }) => x);
+  let gravadas = 0;
+  for (let i = 0; i < limpo.length; i += 200) {
+    const { data, error } = await supa.from('sienge_parcelas')
+      .upsert(limpo.slice(i, i + 200), { onConflict: 'contrato_id,sienge_codigo,parcela_num,data_vencimento', ignoreDuplicates: false })
+      .select('id');
+    if (error) throw new Error('Erro ao gravar parcelas: ' + error.message);
+    gravadas += data?.length || 0;
+  }
+  let canceladas = 0;
+  if (previa.orfasIds?.length) {
+    const { data, error } = await supa.from('sienge_parcelas')
+      .update({ status: 'cancelada', observacoes: 'Não consta mais nos relatórios do SIENGE (importação consolidada)', updated_at: new Date().toISOString() })
+      .in('id', previa.orfasIds).select('id');
+    if (error) throw new Error('Parcelas gravadas, mas falhou ao cancelar as órfãs: ' + error.message);
+    canceladas = data?.length || 0;
+  }
+  if (previa.vincular_centro_custo && previa.centro_custo && previa.empreendimento?.id) {
+    const { data: emp } = await supa.from('empreendimentos').select('config').eq('id', previa.empreendimento.id).single();
+    const config = Object.assign({}, emp?.config || {}, { sienge_centro_custo: { codigo: previa.centro_custo.codigo, nome: previa.centro_custo.nome } });
+    await supa.from('empreendimentos').update({ config }).eq('id', previa.empreendimento.id);
+  }
+  return { gravadas, canceladas };
 }

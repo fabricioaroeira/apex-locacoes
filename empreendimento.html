@@ -204,8 +204,8 @@
         <input type="month" id="financeiro-mes" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px">
         <button class="btn outline" id="btn-financeiro-mes-anterior">‹</button>
         <button class="btn outline" id="btn-financeiro-mes-proximo">›</button>
-        <!-- Botão "Gerar cobranças do mês" removido: SIENGE é fonte oficial; cobranças vêm do PDF importado pela ficha do contrato -->
-        <span style="font-size:11px;color:#94a3b8;font-style:italic">Cobranças vêm do SIENGE — reimporte o PDF pra atualizar status</span>
+        <!-- Cobranças vêm do SIENGE: importação consolidada (todas as lojas) aqui, ou individual pela ficha do contrato -->
+        <button class="btn" id="btn-importar-sienge" title="Anexe os relatórios Contas Recebidas e Contas a Receber de todas as lojas">📥 Importar SIENGE (todas as lojas)</button>
       </div>
     </div>
     <div class="financeiro-subtabs" id="financeiro-subtabs">
@@ -389,6 +389,7 @@ import { abrirFormAreasLojas } from './js/forms-lojas.js';
 import { abrirFormLead } from './js/forms-lead.js';
 import { abrirFormDespesa, abrirFormFornecedor } from './js/forms-financeiro.js';
 import { renderFinanceiro, setFinSubtab, setFinMes } from './js/financeiro-view.js';
+import { abrirImportSiengeConsolidado } from './js/sienge-import-view.js';
 import { initChatWidget } from './js/chat-widget.js';
 import { initContexto, montarSeletor } from './js/contexto.js';
 
@@ -494,6 +495,9 @@ document.getElementById('btn-financeiro-mes-proximo')?.addEventListener('click',
   const d = new Date(a, m, 1);
   inpMes.value = d.toISOString().slice(0, 7);
   setFinMes(inpMes.value);
+});
+document.getElementById('btn-importar-sienge')?.addEventListener('click', () => {
+  abrirImportSiengeConsolidado(() => { renderFinanceiro(); renderTudo(); });
 });
 // Botão "Gerar cobranças do mês" foi REMOVIDO — SIENGE é fonte oficial das cobranças.
 // O handler foi deixado neutro pra evitar erro caso algum elemento legado dispare o evento.
