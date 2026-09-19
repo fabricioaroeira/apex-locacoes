@@ -1942,7 +1942,8 @@ export async function getAlertasPortfolio() {
 
 const SIENGE_STATUS_ABERTO = ['a_vencer', 'atrasada'];
 
-export async function analisarSiengeConsolidado(arquivos) {
+export async function analisarSiengeConsolidado(arquivos, opts = {}) {
+  const alinhar = !!opts.alinhar;   // modo "alinhar": tudo que não está nos relatórios vira cancelada
   if (MOCK_MODE) throw new Error('Importação SIENGE não disponível em MOCK_MODE');
   const ctx = getCtxId();
   if (!ctx) throw new Error('Abra um empreendimento antes de importar — a importação é por empreendimento.');
@@ -2005,11 +2006,16 @@ export async function analisarSiengeConsolidado(arquivos) {
   const hoje = new Date().toISOString().slice(0, 10);
   const parcelas = consolidarParcelas(rel, hoje);
   const payload = [], naoCasadas = [];
+  // Documentos que não trazem a loja nem na unidade nem no código (ex.: "IPTU.05/06"
+  // da Maria Teresa) são resolvidos por um mapa no cadastro do empreendimento:
+  // config.sienge_mapa_documentos = { "IPTU.05/06": "06" }
+  const mapaDocs = (emp?.config && emp.config.sienge_mapa_documentos) || {};
   for (const p of parcelas) {
+    if (!p.loja && mapaDocs[p.documento]) p.loja = String(mapaDocs[p.documento]).padStart(2, '0');
     const lojaId = p.loja ? lojaIdPorCodigo.get(p.loja) : null;
     const contratoId = lojaId ? contratoPorLojaId.get(lojaId) : null;
     if (!contratoId) {
-      naoCasadas.push({ ...p, motivo: !p.loja ? `unidade "${p.unidade}" não é uma loja` : !lojaId ? `loja ${p.loja} não existe neste empreendimento` : `loja ${p.loja} sem contrato ativo` });
+      naoCasadas.push({ ...p, motivo: !p.loja ? `sem loja na unidade nem no documento ${p.documento} (cadastre em config.sienge_mapa_documentos)` : !lojaId ? `loja ${p.loja} não existe neste empreendimento` : `loja ${p.loja} sem contrato ativo` });
       continue;
     }
     payload.push({
@@ -2058,6 +2064,13 @@ export async function analisarSiengeConsolidado(arquivos) {
   const orfas = [];
   for (const e of (existentes || [])) {
     if (noPayload.has(chave(e)) || e.status === 'cancelada') continue;
+    if (alinhar) {
+      // Exceção mesmo no modo alinhar: parcela em aberto vencida ANTES do início
+      // do "a receber" pode ser atraso real que o relatório não cobre — fica.
+      const foraDoPeriodo = perArc && SIENGE_STATUS_ABERTO.includes(e.status) && e.data_vencimento < perArc.de;
+      if (!foraDoPeriodo) orfas.push({ ...e, contrato_nome: nomePorContrato.get(e.contrato_id) || '?' });
+      continue;
+    }
     if (!docsNoRelatorio.has(e.sienge_codigo)) continue;
     let esperada = false;
     if (e.status === 'paga' && perRec && e.data_pagamento && e.data_pagamento >= perRec.de && e.data_pagamento <= perRec.ate) esperada = true;

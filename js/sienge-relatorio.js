@@ -52,7 +52,8 @@ export function dataISO(s) {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 function parc(s) {
-  const m = /^(\d+)\/(\d+)(\*?)$/.exec(s || '');
+  // sufixos: "*" e "C" (parcela vencida com acréscimo calculado) aparecem no SIENGE
+  const m = /^(\d+)\/(\d+)([A-Z*]*)$/.exec(s || '');
   // chaves com prefixo: a linha do "a receber" também tem uma coluna "Total" (em R$),
   // e um nome curto colidia com ela (parcela_total recebia dinheiro).
   return m ? { parcela_num: Number(m[1]), parcela_total: Number(m[2]), parcela_rotulo: s } : { parcela_num: null, parcela_total: null, parcela_rotulo: s || null };
@@ -69,6 +70,20 @@ export function componenteDoDocumento(doc) {
 export function codigoLoja(unidade) {
   const m = /^\s*loja\s+0*(\d+)\s*$/i.exec(unidade || '');
   return m ? String(m[1]).padStart(2, '0') : null;
+}
+// Títulos lançados por CLIENTE (IPTU, condomínio) vêm sem unidade, mas o
+// documento carrega a loja: CT.UNI00126 / IPTU.IPTUUNI04126 / COND.UNI01926
+// = "UNI" + loja com 3 dígitos + ano com 2. O SIENGE às vezes digita a letra
+// O no lugar do zero (CT.UNIO4526) — tratado.
+export function lojaDoDocumento(doc) {
+  const m = /UNI([0-9O]{3})\d{2}\b/i.exec(String(doc || ''));
+  if (!m) return null;
+  const n = parseInt(m[1].replace(/O/gi, '0'), 10);
+  return n > 0 ? String(n).padStart(2, '0') : null;
+}
+// Loja da linha: unidade principal; se vazia, o documento; senão null
+export function lojaDaLinha(r) {
+  return codigoLoja(r.unidade) || lojaDoDocumento(r.documento);
 }
 
 // ---------------------------------------------------------------------
@@ -98,7 +113,7 @@ function parseLinhaRecebida(tokens) {
   const dt_baixa = t.shift();
   // procura a data de emissão: primeiro token de data depois do cliente
   let iEmi = -1;
-  for (let i = 1; i < t.length; i++) if (RE_DATA.test(t[i]) && /^\d+\/\d+\*?$/.test(t[i + 3] || '')) { iEmi = i; break; }
+  for (let i = 1; i < t.length; i++) if (RE_DATA.test(t[i]) && /^\d+\/\d+[A-Z*]*$/.test(t[i + 3] || '')) { iEmi = i; break; }
   if (iEmi < 1) return null;
   const cliente = t.slice(0, iEmi).join(' ');
   const dt_emissao = t[iEmi], documento = t[iEmi + 1], titulo = t[iEmi + 2], parcela = t[iEmi + 3], tc = t[iEmi + 4];
@@ -124,7 +139,7 @@ function parseLinhaAReceber(tokens) {
   if (!RE_DATA.test(dt_calc) || !/^\d+$/.test(dias) || !/^\d+$/.test(id)) return null;
   const vencto = t.shift();
   let iDoc = -1;
-  for (let i = 1; i < t.length; i++) if (/^\d+$/.test(t[i + 1] || '') && /^\d+\/\d+\*?$/.test(t[i + 2] || '')) { iDoc = i; break; }
+  for (let i = 1; i < t.length; i++) if (/^\d+$/.test(t[i + 1] || '') && /^\d+\/\d+[A-Z*]*$/.test(t[i + 2] || '')) { iDoc = i; break; }
   if (iDoc < 1) return null;
   const cliente = t.slice(0, iDoc).join(' ');
   const documento = t[iDoc], titulo = t[iDoc + 1], parcela = t[iDoc + 2], tc = t[iDoc + 3];
@@ -189,7 +204,7 @@ export function consolidarParcelas({ recebidas, aReceber }, hoje) {
     let p = mapa.get(k);
     if (!p) {
       p = { chave: k, documento: r.documento, titulo: r.titulo, parcela_num: r.parcela_num, parcela_total: r.parcela_total, parcela_rotulo: r.parcela_rotulo,
-            unidade: r.unidade, loja: codigoLoja(r.unidade), cliente: r.cliente, componente: componenteDoDocumento(r.documento),
+            unidade: r.unidade, loja: lojaDaLinha(r), cliente: r.cliente, componente: componenteDoDocumento(r.documento),
             data_vencimento: r.data_vencimento, valor_original: 0, valor_pago: 0, acrescimo: 0, desconto: 0,
             data_pagamento: null, baixas: 0, em_aberto: null };
       mapa.set(k, p);
@@ -206,7 +221,7 @@ export function consolidarParcelas({ recebidas, aReceber }, hoje) {
     let p = mapa.get(k);
     if (!p) {
       p = { chave: k, documento: r.documento, titulo: r.titulo, parcela_num: r.parcela_num, parcela_total: r.parcela_total, parcela_rotulo: r.parcela_rotulo,
-            unidade: r.unidade, loja: codigoLoja(r.unidade), cliente: r.cliente, componente: componenteDoDocumento(r.documento),
+            unidade: r.unidade, loja: lojaDaLinha(r), cliente: r.cliente, componente: componenteDoDocumento(r.documento),
             data_vencimento: r.data_vencimento, valor_original: r.valor_original, valor_pago: 0, acrescimo: 0, desconto: 0,
             data_pagamento: null, baixas: 0, em_aberto: null };
       mapa.set(k, p);

@@ -23,6 +23,10 @@ export function abrirImportSiengeConsolidado(onFim) {
       <br>A leitura é feita aqui no navegador, sem IA — os números entram exatamente como estão no relatório.
     </div>
     <input type="file" data-pdfs accept="application/pdf" multiple style="font-size:12px;display:block;margin-bottom:10px">
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--ink);margin-bottom:10px;cursor:pointer">
+      <input type="checkbox" data-alinhar style="margin-top:2px">
+      <span><strong>Alinhar o financeiro aos relatórios</strong> — tudo o que está no sistema para estes contratos e não consta nos PDFs (títulos de IPTU/condomínio de outro centro de custo, cronogramas antigos) é marcado como cancelado. Parcelas vencidas antes do início do "a receber" são mantidas.</span>
+    </label>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
       <button type="button" class="btn sm" data-analisar>Ler relatórios</button>
       <span data-status style="font-size:12px;color:var(--ink-soft)"></span>
@@ -30,6 +34,7 @@ export function abrirImportSiengeConsolidado(onFim) {
     <div data-previa></div>
   `;
   const inp = body.querySelector('[data-pdfs]');
+  const chkAlinhar = body.querySelector('[data-alinhar]');
   const btnAnalisar = body.querySelector('[data-analisar]');
   const status = body.querySelector('[data-status]');
   const boxPrevia = body.querySelector('[data-previa]');
@@ -43,7 +48,7 @@ export function abrirImportSiengeConsolidado(onFim) {
     btnAnalisar.disabled = true; status.textContent = 'Lendo ' + files.length + ' PDF(s)...'; boxPrevia.innerHTML = ''; previa = null;
     const b = submitBtn(); if (b) b.disabled = true;
     try {
-      previa = await analisarSiengeConsolidado(files);
+      previa = await analisarSiengeConsolidado(files, { alinhar: chkAlinhar.checked });
       status.textContent = '';
       boxPrevia.innerHTML = renderPrevia(previa);
       if (b) b.disabled = previa.totais.parcelas === 0;
