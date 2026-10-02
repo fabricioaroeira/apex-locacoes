@@ -152,6 +152,73 @@ h2{font-family:'Outfit','Mulish',sans-serif;font-weight:300;font-size:22px}
 .sugestao .wbtn{flex:none;padding:6px 13px;font-size:12.5px}
 .wiz-foot .obs code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:#eef2f4;padding:1px 5px;border-radius:4px;color:var(--ink-soft)}
 @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+
+/* ===== Celular (até 640px): tela de entrada compacta =====
+   Pedido do Fabrício (02/10/2026): no telefone os cards e os textos ficavam
+   grandes demais. Aqui tudo encolhe — cabeçalho numa linha, pendências viram
+   uma lista discreta de uma linha cada, KPIs menores, e os empreendimentos
+   ficam DOIS POR LINHA. O desktop não muda: nada aqui vale acima de 640px. */
+@media(max-width:640px){
+  body{padding:10px;font-size:13px}
+  /* app.css empilha o header em coluna abaixo de 768px; aqui ele volta a uma linha */
+  header{flex-direction:row;align-items:center;justify-content:space-between;padding:9px 12px;margin-bottom:14px;gap:8px;border-radius:8px;flex-wrap:nowrap}
+  .brand{gap:9px}
+  .brand .mark-logo{height:16px}
+  .brand .brand-sep{height:20px}
+  .brand h1{font-size:11px;letter-spacing:.14em}
+  .brand .sub{display:none}
+  .who{gap:6px;font-size:11px}
+  .who span{display:none}                   /* nome do usuário sai do cabeçalho no celular */
+  .who button{padding:5px 9px;font-size:11px;border-radius:5px}
+  h2{font-size:17px}
+  .sec-head{margin-bottom:7px}
+  .sec-head .meta{font-size:11px}
+  .topo{margin-bottom:9px}
+  .btn-novo{padding:7px 11px;font-size:12px}
+
+  /* Pendências: uma linha por item — selo, título, empreendimento, seta */
+  .pend{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+  .pend a{flex-direction:row;align-items:center;gap:8px;padding:8px 10px;border-radius:8px}
+  .pend a.critico,.pend a.alto{border-left-width:3px}
+  .pend .u{font-size:0;gap:0;flex:none}      /* só o ícone; o texto do selo some */
+  .pend .u svg{width:13px;height:13px}
+  .pend .t{font-size:12.5px;font-weight:600;line-height:1.3;flex:1;min-width:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pend .d{display:none}
+  .pend .foot{margin:0;padding:0;border:0;font-size:10.5px;color:var(--ink-mute);gap:5px;flex:none;max-width:38%}
+  .pend .foot .c{width:7px;height:7px}
+  .pend .foot svg{margin-left:2px;width:11px;height:11px}
+  .pend-vazio{padding:9px 12px;font-size:12px;margin-bottom:16px}
+
+  /* KPIs: 2 por linha, menores */
+  .kpis{grid-template-columns:repeat(2,1fr);margin-bottom:12px;border-radius:8px}
+  .kpi{padding:9px 11px}
+  .kpi:nth-child(odd){border-left:0}
+  .kpi:nth-child(n+3){border-top:1px solid rgba(247,165,26,.55)}
+  .kpi .l{font-size:9px}
+  .kpi .v{font-size:19px;margin-top:3px}
+  .kpi .s{font-size:10px;margin-top:1px}
+
+  /* Empreendimentos: dois cards por linha, só o essencial */
+  .grid{grid-template-columns:1fr 1fr;gap:8px}
+  .ecard{border-radius:9px}
+  .ecard .top{height:4px}
+  .ecard .body{padding:9px 10px 10px}
+  .ecard .tt{gap:6px}
+  .ecard .chip{width:8px;height:8px;margin-top:4px}
+  .ecard h3{font-size:12.5px;line-height:1.25}
+  .ecard .tipo{font-size:9px;letter-spacing:.05em}
+  .ecard .end{display:none}
+  .ecard dl{gap:6px 6px;margin-top:8px;padding-top:7px}
+  .ecard dt{font-size:9px}
+  .ecard dd{font-size:12px}
+  .ecard dd span{display:none}               /* "+ N vagas" sai no celular */
+  .meter{height:4px;margin-top:8px}
+  .mlab{font-size:10px;margin-top:3px}
+  .badges{display:none}
+  .ecard .ed{top:8px;right:8px;width:24px;height:24px;font-size:12px}
+  .ecard .ed.on ~ .body .tt{padding-right:22px}
+}
 </style>
 </head>
 <body>
