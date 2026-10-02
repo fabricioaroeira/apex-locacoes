@@ -24,7 +24,7 @@
 
 <header id="app-header">
   <div class="header-brand">
-    <img src="./imgs/logo-apex.svg" alt="Apex" class="logo-apex">
+    <img src="./imgs/logo-apex.svg" alt="Apex" class="logo-apex" title="Voltar ao portfólio">
     <span class="brand-sep"></span>
     <div class="titles">
       <h1 id="emp-nome">Painel de Controle</h1>
@@ -438,9 +438,12 @@ if (empAtual) {
   // inicial do sistema, então a saída daqui não depende de papel nem de
   // quantos empreendimentos a pessoa tem. Sem condição, some a consulta
   // que era feita só para decidir se o botão aparecia.
-  document.getElementById('btn-portfolio').addEventListener('click', () => {
-    window.location.href = './index.html?r=' + Date.now();   // r = cache-buster do GitHub Pages
-  });
+  const irPortfolio = () => { window.location.href = './index.html?r=' + Date.now(); };   // r = cache-buster do GitHub Pages
+  document.getElementById('btn-portfolio').addEventListener('click', irPortfolio);
+  // O logo Apex e o título também levam ao portfólio — no celular o botão some
+  // e o logo passa a ser o caminho de volta.
+  document.querySelector('.header-brand .logo-apex')?.addEventListener('click', irPortfolio);
+  document.querySelector('.header-brand .titles')?.addEventListener('click', irPortfolio);
 } else {
   document.getElementById('emp-sub').textContent = 'Nenhum empreendimento acessível para este usuário.';
 }

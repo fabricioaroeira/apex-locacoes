@@ -655,3 +655,31 @@ tr:hover td{background:#fafbfc}
 }
 .ctx-chip select option{color:#2c2c2a}
 #btn-portfolio{border-color:rgba(255,255,255,.3)}
+
+/* ===== Logo Apex = voltar ao portfólio (todas as telas) ===== */
+.header-brand img.logo-apex,.header-brand .titles{cursor:pointer}
+.header-brand img.logo-apex:hover{opacity:.85}
+
+/* ===== Celular (até 640px): cabeçalho do empreendimento numa linha =====
+   Pedido do Fabrício (02/10/2026). O nome do empreendimento já aparece no
+   seletor, então o título e o endereço saem; o botão "Portfólio" sai porque
+   o logo Apex passa a levar ao portfólio; fica logo · seletor · Sair. */
+@media (max-width:640px){
+  header#app-header{
+    flex-direction:row;align-items:center;justify-content:space-between;
+    flex-wrap:nowrap;padding:9px 12px;gap:8px;margin-bottom:12px
+  }
+  header#app-header .header-brand{
+    flex-direction:row;align-items:center;text-align:left;gap:8px;
+    padding-bottom:0;border-bottom:0;min-width:0;flex:1
+  }
+  header#app-header .header-brand img.logo-apex{height:16px}
+  header#app-header .header-brand .brand-sep{height:20px}
+  header#app-header .header-brand .titles{display:none}
+  header#app-header #ctx-seletor{min-width:0;flex:1}
+  header#app-header .ctx-chip{margin-left:0;padding:4px 9px;font-size:12px;max-width:100%}
+  header#app-header .ctx-chip select{max-width:150px;font-size:12px;text-overflow:ellipsis}
+  header#app-header .user-menu{gap:6px;flex:none}
+  header#app-header .user-menu .meta,header#app-header .user-menu .nome,header#app-header #btn-portfolio{display:none}
+  header#app-header .user-menu button{padding:5px 9px;font-size:11px;min-height:0;border-radius:5px}
+}
